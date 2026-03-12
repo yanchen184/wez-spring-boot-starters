@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starter Showcase</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            padding: 24px;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 12px 16px;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            font-size: 13px;
+            align-items: center;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ccc;
+            display: inline-block;
+        }
+
+        .status-dot.on { background: #4caf50; }
+        .status-dot.off { background: #ccc; }
+
+        .api-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .api-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .api-card h3 {
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .api-card .desc {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 12px;
+        }
+
+        .api-card .method {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-right: 6px;
+        }
+
+        .method.get { background: #e8f5e9; color: #2e7d32; }
+        .method.post { background: #fff3e0; color: #e65100; }
+        .method.put { background: #e3f2fd; color: #1565c0; }
+        .method.delete { background: #fce4ec; color: #c62828; }
+
+        .section-title {
+            font-size: 18px;
+            margin: 32px 0 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .section-title:first-of-type {
+            margin-top: 0;
+        }
+
+        .api-card .path {
+            font-size: 12px;
+            font-family: monospace;
+            color: #555;
+        }
+
+        .api-card button {
+            margin-top: 12px;
+            padding: 8px 16px;
+            border: 1px solid #1976d2;
+            background: #1976d2;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.15s;
+        }
+
+        .api-card button:hover { background: #1565c0; }
+        .api-card button:active { background: #0d47a1; }
+
+        .api-card label {
+            font-size: 12px;
+            color: #666;
+            display: block;
+            margin-top: 8px;
+        }
+
+        .api-card input, .api-card textarea {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+            margin-top: 4px;
+        }
+
+        .api-card textarea {
+            height: 60px;
+            resize: vertical;
+        }
+
+        .result-panel {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #fafafa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .result-header h2 {
+            font-size: 14px;
+        }
+
+        .result-header button {
+            font-size: 12px;
+            padding: 4px 10px;
+            border: 1px solid #ccc;
+            background: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .result-meta {
+            display: flex;
+            gap: 16px;
+            padding: 8px 16px;
+            background: #fafafa;
+            border-bottom: 1px solid #eee;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .result-meta .status-code {
+            font-weight: 700;
+        }
+
+        .result-meta .status-code.ok { color: #2e7d32; }
+        .result-meta .status-code.err { color: #c62828; }
+
+        #result-body {
+            padding: 16px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 400px;
+            overflow-y: auto;
+            color: #333;
+        }
+
+        .hint {
+            margin-top: 24px;
+            padding: 16px;
+            background: #fff8e1;
+            border: 1px solid #ffe082;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .hint h3 { font-size: 14px; margin-bottom: 8px; }
+        .hint code {
+            background: #f5f5f5;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        @media (max-width: 640px) {
+            .api-grid { grid-template-columns: 1fr; }
+            body { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>Starter Showcase</h1>
+<p class="subtitle">體驗 common-log / common-response / common-jpa / Redis / Actuator + Observability 的效果</p>
+
+<div class="status-bar">
+    <span>Log Starter</span>
+    <span class="status-dot" id="dot-log"></span>
+    <span id="label-log">檢測中...</span>
+    <span style="margin-left: 16px;">Response Starter</span>
+    <span class="status-dot" id="dot-response"></span>
+    <span id="label-response">檢測中...</span>
+    <span style="margin-left: 16px;">JPA Starter</span>
+    <span class="status-dot" id="dot-jpa"></span>
+    <span id="label-jpa">檢測中...</span>
+    <span style="margin-left: 16px;">Redis</span>
+    <span class="status-dot" id="dot-redis"></span>
+    <span id="label-redis">檢測中...</span>
+    <span style="margin-left: 16px;">Actuator</span>
+    <span class="status-dot" id="dot-actuator"></span>
+    <span id="label-actuator">檢測中...</span>
+</div>
+
+<h2 class="section-title">Log & Response Starter</h2>
+
+<div class="api-grid">
+
+    <!-- ok -->
+    <div class="api-card">
+        <h3>正常請求</h3>
+        <p class="desc">基本 log 格式展示</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/log-demo/ok</span>
+        <br>
+        <button onclick="callApi('GET', '/api/log-demo/ok')">發送</button>
+    </div>
+
+    <!-- slow -->
+    <div class="api-card">
+        <h3>慢請求 [SLOW]</h3>
+        <p class="desc">超過閾值自動升級 WARN</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/log-demo/slow</span>
+        <label>延遲秒數
+            <input type="number" id="delay" value="4" min="1" max="30">
+        </label>
+        <button onclick="callApi('GET', '/api/log-demo/slow?delay=' + document.getElementById('delay').value)">發送</button>
+    </div>
+
+    <!-- error -->
+    <div class="api-card">
+        <h3>錯誤請求</h3>
+        <p class="desc">NullPointerException — 看錯誤 log 和回應格式</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/log-demo/error</span>
+        <br>
+        <button onclick="callApi('GET', '/api/log-demo/error')">發送</button>
+    </div>
+
+    <!-- submit -->
+    <div class="api-card">
+        <h3>POST 請求</h3>
+        <p class="desc">展示 request body log</p>
+        <span class="method post">POST</span>
+        <span class="path">/api/log-demo/submit</span>
+        <label>Request Body
+            <textarea id="submit-body">{"name": "test", "age": 25}</textarea>
+        </label>
+        <button onclick="callApi('POST', '/api/log-demo/submit', document.getElementById('submit-body').value)">發送</button>
+    </div>
+
+    <!-- login-mock -->
+    <div class="api-card">
+        <h3>敏感資料遮罩</h3>
+        <p class="desc">password 自動遮罩為 ***</p>
+        <span class="method post">POST</span>
+        <span class="path">/api/log-demo/login-mock</span>
+        <label>Request Body
+            <textarea id="login-body">{"username": "admin", "password": "123456", "secret": "my-secret"}</textarea>
+        </label>
+        <button onclick="callApi('POST', '/api/log-demo/login-mock', document.getElementById('login-body').value)">發送</button>
+    </div>
+
+    <!-- no-request-log -->
+    <div class="api-card">
+        <h3>不印 Request Log</h3>
+        <p class="desc">// @Loggable(logRequest = false) — 只有 &lt;-- 沒有 --&gt;</p>
+        <span class="method post">POST</span>
+        <span class="path">/api/log-demo/no-request-log</span>
+        <label>Request Body
+            <textarea id="no-req-body">{"data": "something", "info": "test"}</textarea>
+        </label>
+        <button onclick="callApi('POST', '/api/log-demo/no-request-log', document.getElementById('no-req-body').value)">發送</button>
+    </div>
+
+    <!-- with-response-body -->
+    <div class="api-card">
+        <h3>印出 Response Body</h3>
+        <p class="desc">// @Loggable(logResponseBody = true) — &lt;-- log 帶 body={...}</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/log-demo/with-response-body</span>
+        <br>
+        <button onclick="callApi('GET', '/api/log-demo/with-response-body')">發送</button>
+    </div>
+
+    <!-- trace-chain -->
+    <div class="api-card">
+        <h3>TraceId 串聯</h3>
+        <p class="desc">4 筆 log 共用同一個 traceId</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/log-demo/trace-chain</span>
+        <br>
+        <button onclick="callApi('GET', '/api/log-demo/trace-chain')">發送</button>
+    </div>
+
+</div>
+
+<h2 class="section-title">JPA Starter — AuditableEntity (Product)</h2>
+
+<div class="api-grid">
+
+    <!-- create product -->
+    <div class="api-card">
+        <h3>建立商品</h3>
+        <p class="desc">觀察 createdBy / createdDate 自動填入</p>
+        <span class="method post">POST</span>
+        <span class="path">/api/jpa-demo/products</span>
+        <label>Request Body
+            <textarea id="product-body">{"name": "MacBook Pro", "price": 59900}</textarea>
+        </label>
+        <button onclick="callApi('POST', '/api/jpa-demo/products', document.getElementById('product-body').value)">發送</button>
+    </div>
+
+    <!-- list products -->
+    <div class="api-card">
+        <h3>查詢所有商品</h3>
+        <p class="desc">觀察審計欄位（createdBy, lastModifiedBy, 時間戳）</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/jpa-demo/products</span>
+        <br>
+        <button onclick="callApi('GET', '/api/jpa-demo/products')">發送</button>
+    </div>
+
+    <!-- update product -->
+    <div class="api-card">
+        <h3>更新商品</h3>
+        <p class="desc">觀察 lastModifiedBy / lastModifiedDate 自動更新</p>
+        <span class="method put">PUT</span>
+        <span class="path">/api/jpa-demo/products/{id}</span>
+        <label>商品 ID
+            <input type="number" id="product-id" value="1" min="1">
+        </label>
+        <label>Request Body
+            <textarea id="product-update-body">{"name": "MacBook Pro M4", "price": 69900}</textarea>
+        </label>
+        <button onclick="callApi('PUT', '/api/jpa-demo/products/' + document.getElementById('product-id').value, document.getElementById('product-update-body').value)">發送</button>
+    </div>
+
+</div>
+
+<h2 class="section-title">JPA Starter — BaseEntity + SoftDeleteRepository (Order)</h2>
+
+<div class="api-grid">
+
+    <!-- create order -->
+    <div class="api-card">
+        <h3>建立訂單</h3>
+        <p class="desc">BaseEntity: 審計 + deleted + version</p>
+        <span class="method post">POST</span>
+        <span class="path">/api/jpa-demo/orders</span>
+        <label>Request Body
+            <textarea id="order-body">{"customerName": "Alice", "amount": 1299}</textarea>
+        </label>
+        <button onclick="callApi('POST', '/api/jpa-demo/orders', document.getElementById('order-body').value)">發送</button>
+    </div>
+
+    <!-- list active orders -->
+    <div class="api-card">
+        <h3>查詢未刪除訂單</h3>
+        <p class="desc">findAllActive() — 自動過濾 deleted=true</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/jpa-demo/orders</span>
+        <br>
+        <button onclick="callApi('GET', '/api/jpa-demo/orders')">發送</button>
+    </div>
+
+    <!-- list all orders -->
+    <div class="api-card">
+        <h3>查詢所有訂單（含已刪除）</h3>
+        <p class="desc">findAll() — 對比 findAllActive() 的差異</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/jpa-demo/orders/all</span>
+        <br>
+        <button onclick="callApi('GET', '/api/jpa-demo/orders/all')">發送</button>
+    </div>
+
+    <!-- soft delete order -->
+    <div class="api-card">
+        <h3>軟刪除訂單</h3>
+        <p class="desc">softDeleteById() — deleted 設為 true，資料仍在</p>
+        <span class="method delete">DELETE</span>
+        <span class="path">/api/jpa-demo/orders/{id}</span>
+        <label>訂單 ID
+            <input type="number" id="delete-order-id" value="1" min="1">
+        </label>
+        <button onclick="callApi('DELETE', '/api/jpa-demo/orders/' + document.getElementById('delete-order-id').value)">發送</button>
+    </div>
+
+    <!-- restore order -->
+    <div class="api-card">
+        <h3>恢復訂單</h3>
+        <p class="desc">restoreById() — deleted 設回 false</p>
+        <span class="method put">PUT</span>
+        <span class="path">/api/jpa-demo/orders/{id}/restore</span>
+        <label>訂單 ID
+            <input type="number" id="restore-order-id" value="1" min="1">
+        </label>
+        <button onclick="callApi('PUT', '/api/jpa-demo/orders/' + document.getElementById('restore-order-id').value + '/restore')">發送</button>
+    </div>
+
+    <!-- count active orders -->
+    <div class="api-card">
+        <h3>統計訂單數</h3>
+        <p class="desc">countActive() vs count() — 對比未刪除與全部</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/jpa-demo/orders/count</span>
+        <br>
+        <button onclick="callApi('GET', '/api/jpa-demo/orders/count')">發送</button>
+    </div>
+
+</div>
+
+<h2 class="section-title">Redis — RedisTemplate 基本操作</h2>
+
+<div class="api-grid">
+
+    <!-- SET -->
+    <div class="api-card">
+        <h3>SET key-value</h3>
+        <p class="desc">寫入 Redis（可選 TTL 秒數）</p>
+        <span class="method post">POST</span>
+        <span class="path">/api/redis-demo/set</span>
+        <label>Request Body
+            <textarea id="redis-set-body">{"key": "greeting", "value": "Hello Redis!", "ttl": 30}</textarea>
+        </label>
+        <button onclick="callApi('POST', '/api/redis-demo/set', document.getElementById('redis-set-body').value)">發送</button>
+    </div>
+
+    <!-- GET -->
+    <div class="api-card">
+        <h3>GET key</h3>
+        <p class="desc">讀取 Redis key，觀察 TTL 倒數</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/redis-demo/get/{key}</span>
+        <label>Key
+            <input type="text" id="redis-get-key" value="greeting">
+        </label>
+        <button onclick="callApi('GET', '/api/redis-demo/get/' + document.getElementById('redis-get-key').value)">發送</button>
+    </div>
+
+    <!-- DELETE -->
+    <div class="api-card">
+        <h3>DELETE key</h3>
+        <p class="desc">刪除 Redis key</p>
+        <span class="method delete">DELETE</span>
+        <span class="path">/api/redis-demo/delete/{key}</span>
+        <label>Key
+            <input type="text" id="redis-del-key" value="greeting">
+        </label>
+        <button onclick="callApi('DELETE', '/api/redis-demo/delete/' + document.getElementById('redis-del-key').value)">發送</button>
+    </div>
+
+    <!-- KEYS -->
+    <div class="api-card">
+        <h3>KEYS *</h3>
+        <p class="desc">列出所有 Redis key</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/redis-demo/keys</span>
+        <br>
+        <button onclick="callApi('GET', '/api/redis-demo/keys')">發送</button>
+    </div>
+
+</div>
+
+<h2 class="section-title">Redis — @Cacheable 搭配 JPA</h2>
+
+<div class="api-grid">
+
+    <!-- cached product query -->
+    <div class="api-card">
+        <h3>查詢商品（有快取）</h3>
+        <p class="desc">第一次打 DB（看 console SQL），第二次從 Redis 讀（無 SQL）</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/redis-demo/products/{id}</span>
+        <label>商品 ID
+            <input type="number" id="cached-product-id" value="1" min="1">
+        </label>
+        <button onclick="callApi('GET', '/api/redis-demo/products/' + document.getElementById('cached-product-id').value)">發送</button>
+    </div>
+
+    <!-- evict single -->
+    <div class="api-card">
+        <h3>清除單筆快取</h3>
+        <p class="desc">@CacheEvict — 清除後下次查詢會重新打 DB</p>
+        <span class="method delete">DELETE</span>
+        <span class="path">/api/redis-demo/products/{id}/cache</span>
+        <label>商品 ID
+            <input type="number" id="evict-product-id" value="1" min="1">
+        </label>
+        <button onclick="callApi('DELETE', '/api/redis-demo/products/' + document.getElementById('evict-product-id').value + '/cache')">發送</button>
+    </div>
+
+    <!-- evict all -->
+    <div class="api-card">
+        <h3>清除所有商品快取</h3>
+        <p class="desc">@CacheEvict(allEntries = true)</p>
+        <span class="method delete">DELETE</span>
+        <span class="path">/api/redis-demo/products/cache</span>
+        <br>
+        <button onclick="callApi('DELETE', '/api/redis-demo/products/cache')">發送</button>
+    </div>
+
+</div>
+
+<h2 class="section-title">Actuator — 內建端點</h2>
+
+<div class="api-grid">
+
+    <!-- health -->
+    <div class="api-card">
+        <h3>Health Check</h3>
+        <p class="desc">應用健康狀態（含 DB、Redis、磁碟）</p>
+        <span class="method get">GET</span>
+        <span class="path">/actuator/health</span>
+        <br>
+        <button onclick="callApi('GET', '/actuator/health')">發送</button>
+    </div>
+
+    <!-- info -->
+    <div class="api-card">
+        <h3>App Info</h3>
+        <p class="desc">應用資訊（名稱、版本、描述）</p>
+        <span class="method get">GET</span>
+        <span class="path">/actuator/info</span>
+        <br>
+        <button onclick="callApi('GET', '/actuator/info')">發送</button>
+    </div>
+
+    <!-- metrics list -->
+    <div class="api-card">
+        <h3>Metrics 列表</h3>
+        <p class="desc">所有可用的 metric 名稱</p>
+        <span class="method get">GET</span>
+        <span class="path">/actuator/metrics</span>
+        <br>
+        <button onclick="callApi('GET', '/actuator/metrics')">發送</button>
+    </div>
+
+    <!-- specific metric -->
+    <div class="api-card">
+        <h3>查詢特定 Metric</h3>
+        <p class="desc">輸入 metric 名稱查看詳細數據（含 P50/P95/P99）</p>
+        <span class="method get">GET</span>
+        <span class="path">/actuator/metrics/{name}</span>
+        <label>Metric 名稱
+            <input type="text" id="metric-name" value="http.server.requests">
+        </label>
+        <button onclick="callApi('GET', '/actuator/metrics/' + document.getElementById('metric-name').value)">發送</button>
+    </div>
+
+    <!-- prometheus -->
+    <div class="api-card">
+        <h3>Prometheus 格式</h3>
+        <p class="desc">所有 metrics 的 Prometheus 輸出（可直接接 Grafana）</p>
+        <span class="method get">GET</span>
+        <span class="path">/actuator/prometheus</span>
+        <br>
+        <button onclick="callApi('GET', '/actuator/prometheus')">發送</button>
+    </div>
+
+    <!-- caches -->
+    <div class="api-card">
+        <h3>快取管理</h3>
+        <p class="desc">列出所有 Cache（搭配 Redis @Cacheable）</p>
+        <span class="method get">GET</span>
+        <span class="path">/actuator/caches</span>
+        <br>
+        <button onclick="callApi('GET', '/actuator/caches')">發送</button>
+    </div>
+
+</div>
+
+<h2 class="section-title">Observability — @Timed / @Counted / @Observed</h2>
+
+<div class="api-grid">
+
+    <!-- @Timed -->
+    <div class="api-card">
+        <h3>@Timed 自動計時</h3>
+        <p class="desc">模擬隨機延遲，打幾次後看 metric 的 P50/P95/P99</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/observability-demo/timed</span>
+        <br>
+        <button onclick="callApi('GET', '/api/observability-demo/timed')">發送</button>
+    </div>
+
+    <!-- @Counted -->
+    <div class="api-card">
+        <h3>@Counted 自動計數</h3>
+        <p class="desc">每呼叫一次 count +1，去 metrics 查看累計值</p>
+        <span class="method post">POST</span>
+        <span class="path">/api/observability-demo/counted</span>
+        <label>Request Body
+            <textarea id="counted-body">{"event": "button_click", "page": "home"}</textarea>
+        </label>
+        <button onclick="callApi('POST', '/api/observability-demo/counted', document.getElementById('counted-body').value)">發送</button>
+    </div>
+
+    <!-- @Observed -->
+    <div class="api-card">
+        <h3>@Observed (Micrometer 2)</h3>
+        <p class="desc">一個註解同時產生 metric + trace span</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/observability-demo/observed</span>
+        <br>
+        <button onclick="callApi('GET', '/api/observability-demo/observed')">發送</button>
+    </div>
+
+    <!-- custom counter -->
+    <div class="api-card">
+        <h3>自訂 Counter</h3>
+        <p class="desc">MeterRegistry 手動建立 metric</p>
+        <span class="method post">POST</span>
+        <span class="path">/api/observability-demo/custom-counter</span>
+        <label>Request Body
+            <textarea id="counter-body">{"amount": 5}</textarea>
+        </label>
+        <button onclick="callApi('POST', '/api/observability-demo/custom-counter', document.getElementById('counter-body').value)">發送</button>
+    </div>
+
+    <!-- random result -->
+    <div class="api-card">
+        <h3>隨機成功/失敗</h3>
+        <p class="desc">打多次後看 metric 按 status（200/500）分類統計</p>
+        <span class="method get">GET</span>
+        <span class="path">/api/observability-demo/random-result</span>
+        <br>
+        <button onclick="callApi('GET', '/api/observability-demo/random-result')">發送</button>
+    </div>
+
+    <!-- check timed metric -->
+    <div class="api-card">
+        <h3>查看 @Timed 結果</h3>
+        <p class="desc">快捷查看 showcase.timed.method 的統計數據</p>
+        <span class="method get">GET</span>
+        <span class="path">/actuator/metrics/showcase.timed.method</span>
+        <br>
+        <button onclick="callApi('GET', '/actuator/metrics/showcase.timed.method')">發送</button>
+    </div>
+
+</div>
+
+<!-- 結果面板 -->
+<div class="result-panel">
+    <div class="result-header">
+        <h2>Response</h2>
+        <button onclick="clearResult()">清除</button>
+    </div>
+    <div class="result-meta" id="result-meta" style="display:none;">
+        <span>Status: <span class="status-code" id="result-status"></span></span>
+        <span>Time: <span id="result-time"></span></span>
+        <span>URL: <span id="result-url"></span></span>
+    </div>
+    <div id="result-body">點擊上方按鈕發送請求...</div>
+</div>
+
+<div class="hint">
+    <h3>如何體驗差異？</h3>
+    <p>
+        關閉 starter：把 <code>application.yml</code> 中 <code>common.log.enabled</code> 改為 <code>false</code>，重新啟動後打 API 對比差異：<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;✅ 自動 <code>--></code> / <code>&lt;--</code> log &nbsp;
+        ✅ traceId/spanId &nbsp;
+        ✅ password 遮罩 &nbsp;
+        ✅ [SLOW] 標記 &nbsp;
+        ✅ 統一錯誤回應
+    </p>
+    <h3 style="margin-top: 12px;">JPA Demo 體驗流程</h3>
+    <p>
+        1. 建立幾筆商品和訂單，觀察回應中的審計欄位（createdBy, createdDate）<br>
+        2. 更新商品，觀察 lastModifiedBy / lastModifiedDate 自動變化<br>
+        3. 軟刪除一筆訂單，然後分別查「未刪除」和「全部」，對比差異<br>
+        4. 恢復刪除的訂單，確認 deleted 變回 false<br>
+        5. H2 Console：<code>http://localhost:8080/h2-console</code>（JDBC URL: <code>jdbc:h2:mem:showcase</code>）
+    </p>
+    <h3 style="margin-top: 12px;">Redis Demo 體驗流程</h3>
+    <p>
+        1. 先用 JPA 建立一筆商品（POST /api/jpa-demo/products）<br>
+        2. 用 Redis 快取查詢（GET /api/redis-demo/products/1）— 觀察 console 有 SQL log（cache miss）<br>
+        3. 再查一次同一筆 — console 沒有 SQL（cache hit），回應更快<br>
+        4. 清除快取（DELETE /api/redis-demo/products/1/cache）<br>
+        5. 再查一次 — 又會打 DB（cache miss）<br>
+        6. 用 KEYS * 觀察 Redis 裡存了什麼 key
+    </p>
+    <h3 style="margin-top: 12px;">Actuator + Observability 體驗流程</h3>
+    <p>
+        1. 先打幾個 API（任何區塊都行），產生一些流量<br>
+        2. 查看 <code>/actuator/health</code> — 觀察 DB、Redis 健康狀態<br>
+        3. 打 @Timed API 5~10 次，然後查 <code>/actuator/metrics/showcase.timed.method</code> — 看 COUNT、MAX、P50/P95/P99<br>
+        4. 打 @Observed API — 觀察 console 的 traceId（metric + trace 同時產生）<br>
+        5. 打「隨機成功/失敗」多次，查 <code>/actuator/metrics/showcase.random.result</code> — 按 status 分類<br>
+        6. 查 <code>/actuator/metrics/http.server.requests</code> — 所有 HTTP 請求的自動統計（不用寫任何程式碼）<br>
+        7. 查 <code>/actuator/prometheus</code> — Prometheus 格式輸出（可直接接 Grafana）
+    </p>
+</div>
+
+<script>
+    async function callApi(method, url, body) {
+        const startTime = performance.now();
+        const meta = document.getElementById('result-meta');
+        const statusEl = document.getElementById('result-status');
+        const timeEl = document.getElementById('result-time');
+        const urlEl = document.getElementById('result-url');
+        const bodyEl = document.getElementById('result-body');
+
+        bodyEl.textContent = '請求中...';
+        meta.style.display = 'none';
+
+        try {
+            const options = { method };
+            if (body) {
+                options.headers = { 'Content-Type': 'application/json' };
+                options.body = body;
+            }
+
+            const response = await fetch(url, options);
+            const elapsed = Math.round(performance.now() - startTime);
+            const text = await response.text();
+
+            meta.style.display = 'flex';
+            statusEl.textContent = response.status;
+            statusEl.className = 'status-code ' + (response.ok ? 'ok' : 'err');
+            timeEl.textContent = elapsed + 'ms';
+            urlEl.textContent = method + ' ' + url;
+
+            try {
+                const json = JSON.parse(text);
+                bodyEl.textContent = JSON.stringify(json, null, 2);
+            } catch {
+                bodyEl.textContent = text;
+            }
+        } catch (err) {
+            meta.style.display = 'flex';
+            statusEl.textContent = 'ERR';
+            statusEl.className = 'status-code err';
+            timeEl.textContent = '-';
+            urlEl.textContent = method + ' ' + url;
+            bodyEl.textContent = '請求失敗: ' + err.message;
+        }
+    }
+
+    function clearResult() {
+        document.getElementById('result-meta').style.display = 'none';
+        document.getElementById('result-body').textContent = '點擊上方按鈕發送請求...';
+    }
+
+    // 偵測 starter 是否啟用
+    async function detectStarters() {
+        const dotLog = document.getElementById('dot-log');
+        const labelLog = document.getElementById('label-log');
+        const dotResponse = document.getElementById('dot-response');
+        const labelResponse = document.getElementById('label-response');
+
+        // 打 /error 來偵測：有 response-starter 會回 ApiResponse 格式（success/code）
+        try {
+            const res = await fetch('/api/log-demo/error');
+            const text = await res.text();
+            const json = JSON.parse(text);
+
+            // response-starter 攔截異常後會包成 { success, code, message }
+            if (json.success !== undefined && json.code !== undefined) {
+                dotResponse.className = 'status-dot on';
+                labelResponse.textContent = '已啟用';
+            } else {
+                dotResponse.className = 'status-dot off';
+                labelResponse.textContent = '未啟用';
+            }
+        } catch {
+            dotResponse.className = 'status-dot off';
+            labelResponse.textContent = '無法偵測';
+        }
+
+        // log-starter: 打 /ok 後看 response header 有無 traceId，
+        // 或用 actuator，這裡簡單用啟動 log 的 class 偵測
+        try {
+            const res = await fetch('/api/log-demo/ok');
+            const traceHeader = res.headers.get('traceparent');
+            if (traceHeader) {
+                dotLog.className = 'status-dot on';
+                labelLog.textContent = '已啟用';
+            } else {
+                // 無法從前端確定，標記為未知
+                dotLog.className = 'status-dot off';
+                labelLog.textContent = '看 console 確認';
+            }
+        } catch {
+            dotLog.className = 'status-dot off';
+            labelLog.textContent = '無法偵測';
+        }
+    }
+
+    // 偵測 JPA starter
+    async function detectJpa() {
+        const dotJpa = document.getElementById('dot-jpa');
+        const labelJpa = document.getElementById('label-jpa');
+        try {
+            const res = await fetch('/api/jpa-demo/products');
+            if (res.ok) {
+                dotJpa.className = 'status-dot on';
+                labelJpa.textContent = '已啟用';
+            } else {
+                dotJpa.className = 'status-dot off';
+                labelJpa.textContent = '未啟用';
+            }
+        } catch {
+            dotJpa.className = 'status-dot off';
+            labelJpa.textContent = '無法偵測';
+        }
+    }
+
+    // 偵測 Redis
+    async function detectRedis() {
+        const dotRedis = document.getElementById('dot-redis');
+        const labelRedis = document.getElementById('label-redis');
+        try {
+            const res = await fetch('/api/redis-demo/keys');
+            if (res.ok) {
+                dotRedis.className = 'status-dot on';
+                labelRedis.textContent = '已啟用';
+            } else {
+                dotRedis.className = 'status-dot off';
+                labelRedis.textContent = '未啟用';
+            }
+        } catch {
+            dotRedis.className = 'status-dot off';
+            labelRedis.textContent = '無法偵測';
+        }
+    }
+
+    // 偵測 Actuator
+    async function detectActuator() {
+        const dotActuator = document.getElementById('dot-actuator');
+        const labelActuator = document.getElementById('label-actuator');
+        try {
+            const res = await fetch('/actuator/health');
+            if (res.ok) {
+                dotActuator.className = 'status-dot on';
+                labelActuator.textContent = '已啟用';
+            } else {
+                dotActuator.className = 'status-dot off';
+                labelActuator.textContent = '未啟用';
+            }
+        } catch {
+            dotActuator.className = 'status-dot off';
+            labelActuator.textContent = '無法偵測';
+        }
+    }
+
+    detectStarters();
+    detectJpa();
+    detectRedis();
+    detectActuator();
+</script>
+
+</body>
+</html>

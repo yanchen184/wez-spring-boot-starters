@@ -20,6 +20,8 @@
         <module>common-response-spring-boot-starter</module>
         <!-- 安全模組（依賴上面三個） -->
         <module>care-security</module>
+        <!-- Demo 展示專案 -->
+        <module>starter-showcase</module>
     </modules>
 
     <properties>
