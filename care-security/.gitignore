@@ -1,0 +1,28 @@
+# Build
+target/
+build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Gradle (removed, but just in case)
+.gradle/
+gradle/
+gradlew
+gradlew.bat
+
+# Maven wrapper
+.mvn/
+mvnw
+mvnw.cmd
+
+# Sensitive config (use .example as template)
+**/application-test.yml
+**/application.yml

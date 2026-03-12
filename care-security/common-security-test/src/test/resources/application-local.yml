@@ -1,0 +1,77 @@
+spring:
+  datasource:
+    url: jdbc:sqlserver://localhost:1433;databaseName=care_security;encrypt=false;trustServerCertificate=true
+    username: care_dev
+    password: CareSecDev@2026
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 300000
+      connection-timeout: 60000
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: true
+    open-in-view: false
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      password: CareRedis@2026
+      timeout: 5000ms
+
+  security:
+    oauth2:
+      authorizationserver:
+        issuer-url: http://localhost:8080
+
+care:
+  security:
+    enabled: true
+    jwt:
+      access-token-ttl-minutes: 30
+      refresh-token-ttl-days: 7
+    login:
+      max-attempts: 5
+      lock-duration-minutes: 30
+    cors:
+      allowed-origins: http://localhost:3000
+    otp:
+      enabled: true
+      issuer: CareSecurityTest
+      allowed-skew: 1
+    captcha:
+      enabled: true
+      length: 4
+      expire-seconds: 300
+    citizen-cert:
+      enabled: true
+      challenge-expire-seconds: 300
+      auto-create-user: true
+      default-roles:
+        - ROLE_USER
+
+care-test:
+  admin-password: "Admin@123"
+  non-admin-username: "TEST01"
+
+server:
+  port: 0
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+logging:
+  level:
+    com.company.common: DEBUG
+    org.springframework.security: WARN

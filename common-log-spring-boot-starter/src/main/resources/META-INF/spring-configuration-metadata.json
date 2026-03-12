@@ -1,0 +1,65 @@
+{
+  "groups": [
+    {
+      "name": "common.log",
+      "type": "com.company.common.log.config.LogProperties",
+      "sourceType": "com.company.common.log.config.LogProperties",
+      "description": "Common Log Module Configuration"
+    }
+  ],
+  "properties": [
+    {
+      "name": "common.log.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable/disable the common log module",
+      "defaultValue": true
+    },
+    {
+      "name": "common.log.log-request",
+      "type": "java.lang.Boolean",
+      "description": "Whether to log request parameters",
+      "defaultValue": true
+    },
+    {
+      "name": "common.log.log-response",
+      "type": "java.lang.Boolean",
+      "description": "Whether to log response content",
+      "defaultValue": true
+    },
+    {
+      "name": "common.log.log-duration",
+      "type": "java.lang.Boolean",
+      "description": "Whether to log execution duration",
+      "defaultValue": true
+    },
+    {
+      "name": "common.log.slow-threshold-ms",
+      "type": "java.lang.Long",
+      "description": "Slow API threshold in milliseconds. Responses exceeding this threshold are logged at WARN level with [SLOW] marker",
+      "defaultValue": 3000
+    },
+    {
+      "name": "common.log.log-response-body",
+      "type": "java.lang.Boolean",
+      "description": "Whether to log response body (masked). Can be overridden per-method via @Loggable(logResponseBody = true)",
+      "defaultValue": false
+    },
+    {
+      "name": "common.log.max-response-length",
+      "type": "java.lang.Integer",
+      "description": "Maximum response body length to log. Content exceeding this length will be truncated",
+      "defaultValue": 1000
+    },
+    {
+      "name": "common.log.mask-fields",
+      "type": "java.util.Set<java.lang.String>",
+      "description": "Field names to mask in logs (sensitive data protection)"
+    },
+    {
+      "name": "common.log.exclude-patterns",
+      "type": "java.util.Set<java.lang.String>",
+      "description": "URL patterns to exclude from logging (e.g. /actuator/**, /health)"
+    }
+  ],
+  "hints": []
+}

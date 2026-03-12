@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.company.common</groupId>
+        <artifactId>company-common-starters</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>common-security</artifactId>
+    <packaging>pom</packaging>
+    <name>common-security</name>
+    <description>Common Security Spring Boot Starter</description>
+
+    <properties>
+        <password4j.version>1.8.2</password4j.version>
+        <!-- jackson-bom: Spring Boot 4.0.3 綁定 3.0.4，有 GHSA-72hv-8253-57qq 漏洞（僅影響 async parser/WebFlux）。
+             修復版 3.1.0 與 Spring Boot 4.0.3 不相容（JsonMapper$Builder breaking change），
+             待 Spring Boot 升級至 4.0.4+ 後再更新。 -->
+    </properties>
+
+    <modules>
+        <module>common-security-core</module>
+        <module>common-security-autoconfigure</module>
+        <module>common-security-spring-boot-starter</module>
+        <module>common-security-test</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.company.common</groupId>
+                <artifactId>common-security-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.company.common</groupId>
+                <artifactId>common-security-autoconfigure</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.company.common</groupId>
+                <artifactId>common-security-spring-boot-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.password4j</groupId>
+                <artifactId>password4j</artifactId>
+                <version>${password4j.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

@@ -1,0 +1,130 @@
+package com.company.common.security.controller;
+
+import com.company.common.security.dto.request.ChangePasswordRequest;
+import com.company.common.security.dto.request.LoginRequest;
+import com.company.common.security.dto.request.LogoutRequest;
+import com.company.common.security.dto.request.RefreshTokenRequest;
+import com.company.common.security.dto.request.SwitchUserRequest;
+import com.company.common.response.dto.ApiResponse;
+import com.company.common.security.dto.response.MyOrgResponse;
+import com.company.common.security.dto.response.TokenResponse;
+import com.company.common.security.dto.response.UserInfoResponse;
+import com.company.common.security.security.CustomUserDetails;
+import com.company.common.security.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@Tag(name = "Auth", description = "Authentication and token management")
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+
+    private final AuthService authService;
+
+    public AuthController(AuthService authService) {
+        this.authService = authService;
+    }
+
+    @Operation(summary = "Login", description = "Authenticate with username/password and receive JWT tokens")
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<TokenResponse>> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest) {
+        String ipAddress = getClientIp(httpRequest);
+        String userAgent = httpRequest.getHeader("User-Agent");
+        TokenResponse token = authService.login(request, ipAddress, userAgent);
+        return ResponseEntity.ok(ApiResponse.ok("Login successful", token));
+    }
+
+    @Operation(summary = "Refresh token", description = "Exchange a valid refresh token for a new access token")
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<TokenResponse>> refresh(
+            @Valid @RequestBody RefreshTokenRequest request) {
+        TokenResponse token = authService.refresh(request.refreshToken());
+        return ResponseEntity.ok(ApiResponse.ok("Token refreshed", token));
+    }
+
+    @Operation(summary = "Logout", description = "Invalidate refresh token")
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(@RequestBody LogoutRequest request) {
+        authService.logout(request.refreshToken());
+        return ResponseEntity.ok(ApiResponse.ok("Logged out successfully", null));
+    }
+
+    @Operation(summary = "Change password", description = "Change the authenticated user's password")
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request,
+            Authentication authentication) {
+        authService.changePassword(authentication.getName(), request);
+        return ResponseEntity.ok(ApiResponse.ok("Password changed successfully", null));
+    }
+
+    @Operation(summary = "Get current user info", description = "Returns user profile, roles, org roles, and CRUD permissions")
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UserInfoResponse>> me(Authentication authentication) {
+        Jwt jwt = ((JwtAuthenticationToken) authentication).getToken();
+        Long currentOrgId = jwt.hasClaim("currentOrgId") ? jwt.getClaim("currentOrgId") : null;
+        CustomUserDetails details = authService.getUserInfo(authentication.getName(), currentOrgId);
+        return ResponseEntity.ok(ApiResponse.ok(UserInfoResponse.from(details)));
+    }
+
+    @Operation(summary = "Get my organizations", description = "List all organizations the current user belongs to")
+    @GetMapping("/my-orgs")
+    public ResponseEntity<ApiResponse<List<MyOrgResponse>>> getMyOrgs(Authentication authentication) {
+        List<MyOrgResponse> orgs = authService.getMyOrgs(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(orgs));
+    }
+
+    @Operation(summary = "Switch user (impersonate)", description = "Admin impersonates another user. Requires ROLE_ADMIN.")
+    @PostMapping("/switch-user")
+    public ResponseEntity<ApiResponse<TokenResponse>> switchUser(
+            @Valid @RequestBody SwitchUserRequest request,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        String ipAddress = getClientIp(httpRequest);
+        String userAgent = httpRequest.getHeader("User-Agent");
+        TokenResponse token = authService.switchUser(
+                authentication.getName(), request.username(), request.orgId(), ipAddress, userAgent);
+        return ResponseEntity.ok(ApiResponse.ok("Switched to user: " + request.username(), token));
+    }
+
+    @Operation(summary = "Exit switch user", description = "Return to the original admin account after impersonation")
+    @PostMapping("/exit-switch-user")
+    public ResponseEntity<ApiResponse<TokenResponse>> exitSwitchUser(
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        Jwt jwt = ((JwtAuthenticationToken) authentication).getToken();
+        String impersonatedBy = jwt.getClaimAsString("impersonatedBy");
+        if (impersonatedBy == null || impersonatedBy.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Not currently impersonating any user"));
+        }
+        String ipAddress = getClientIp(httpRequest);
+        String userAgent = httpRequest.getHeader("User-Agent");
+        String currentUser = authentication.getName();
+        TokenResponse token = authService.exitSwitchUser(impersonatedBy, currentUser, ipAddress, userAgent);
+        return ResponseEntity.ok(ApiResponse.ok("Returned to admin: " + impersonatedBy, token));
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
+}

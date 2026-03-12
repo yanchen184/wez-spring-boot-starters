@@ -1,0 +1,54 @@
+spring:
+  datasource:
+    url: jdbc:sqlserver://localhost:1433;databaseName=yourdb;encrypt=false;trustServerCertificate=true
+    username: your_username
+    password: your_password
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 300000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.SQLServerDialect
+        format_sql: true
+    show-sql: true
+    open-in-view: false
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      password: your_redis_password
+      timeout: 5000ms
+
+  security:
+    oauth2:
+      authorizationserver:
+        issuer-url: http://localhost:8080
+
+care:
+  security:
+    enabled: true
+    jwt:
+      access-token-ttl-minutes: 30
+      refresh-token-ttl-days: 7
+    login:
+      max-attempts: 99
+      lock-duration-minutes: 30
+    cors:
+      allowed-origins: http://localhost:3000
+
+server:
+  port: 0
+
+logging:
+  level:
+    gov.mohw.care: DEBUG
+    org.springframework.security: WARN
+    org.hibernate.SQL: DEBUG
