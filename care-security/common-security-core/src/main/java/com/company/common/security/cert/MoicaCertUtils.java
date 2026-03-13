@@ -77,10 +77,11 @@ public class MoicaCertUtils {
 
     private final X509Certificate certificate;
     private final List<X509Certificate> intermediateCerts;
+    private final List<X509CRL> localCrls;
     private final boolean ocspEnabled;
     private final boolean crlEnabled;
 
-    // In-memory CRL cache: URL -> CachedCrl
+    // In-memory CRL cache: URL -> CachedCrl (for network-downloaded CRLs)
     private static final Map<String, CachedCrl> crlCache = new ConcurrentHashMap<>();
 
     static {
@@ -92,22 +93,32 @@ public class MoicaCertUtils {
     /**
      * @param certificate       the end-entity citizen certificate to verify
      * @param intermediateCerts the list of MOICA intermediate CA certificates (e.g., MOICA2.cer, MOICA3.cer)
+     * @param localCrls         pre-loaded local CRL files to check before downloading from network
      * @param ocspEnabled       whether to perform OCSP revocation checking
      * @param crlEnabled        whether to perform CRL revocation checking
      */
     public MoicaCertUtils(X509Certificate certificate, List<X509Certificate> intermediateCerts,
-                          boolean ocspEnabled, boolean crlEnabled) {
+                          List<X509CRL> localCrls, boolean ocspEnabled, boolean crlEnabled) {
         this.certificate = certificate;
         this.intermediateCerts = intermediateCerts != null ? intermediateCerts : List.of();
+        this.localCrls = localCrls != null ? localCrls : List.of();
         this.ocspEnabled = ocspEnabled;
         this.crlEnabled = crlEnabled;
+    }
+
+    /**
+     * Convenience constructor without local CRLs.
+     */
+    public MoicaCertUtils(X509Certificate certificate, List<X509Certificate> intermediateCerts,
+                          boolean ocspEnabled, boolean crlEnabled) {
+        this(certificate, intermediateCerts, List.of(), ocspEnabled, crlEnabled);
     }
 
     /**
      * Convenience constructor using default revocation settings (both enabled).
      */
     public MoicaCertUtils(X509Certificate certificate, List<X509Certificate> intermediateCerts) {
-        this(certificate, intermediateCerts, true, true);
+        this(certificate, intermediateCerts, List.of(), true, true);
     }
 
     /**
@@ -379,13 +390,36 @@ public class MoicaCertUtils {
 
     /**
      * Check certificate revocation via CRL.
+     * Strategy: check local CRL files first (fast, no network), then fall back to downloading
+     * from the CDP URLs in the certificate.
      *
      * @return true if revoked, false if not revoked
      */
     private boolean checkCrl() throws Exception {
+        // 1. Check local CRL files first (issuer must match)
+        for (X509CRL localCrl : localCrls) {
+            if (localCrl.getIssuerX500Principal().equals(certificate.getIssuerX500Principal())) {
+                if (localCrl.isRevoked(certificate)) {
+                    log.warn("Certificate is REVOKED according to local CRL (issuer={})",
+                            localCrl.getIssuerX500Principal());
+                    return true;
+                }
+                log.debug("Certificate is not revoked according to local CRL (issuer={})",
+                        localCrl.getIssuerX500Principal());
+                return false;
+            }
+        }
+
+        // 2. Fall back to network CRL download from CDP extension
         List<String> crlUrls = getCrlDistributionPoints();
         if (crlUrls.isEmpty()) {
-            log.warn("No CRL distribution points found in certificate");
+            if (!localCrls.isEmpty()) {
+                // We have local CRLs but none matched the issuer — log a warning
+                log.warn("No matching local CRL for issuer: {}, and no CDP URLs in certificate",
+                        certificate.getIssuerX500Principal());
+            } else {
+                log.warn("No CRL distribution points found in certificate and no local CRLs configured");
+            }
             return false;
         }
 
@@ -393,13 +427,13 @@ public class MoicaCertUtils {
             try {
                 X509CRL crl = downloadCrl(crlUrl);
                 if (crl != null && crl.isRevoked(certificate)) {
-                    log.warn("Certificate is REVOKED according to CRL: {}", crlUrl);
+                    log.warn("Certificate is REVOKED according to network CRL: {}", crlUrl);
                     return true;
                 }
-                log.debug("Certificate is not revoked according to CRL: {}", crlUrl);
+                log.debug("Certificate is not revoked according to network CRL: {}", crlUrl);
                 return false;
             } catch (Exception e) {
-                log.warn("Failed to check CRL at {}: {}", crlUrl, e.getMessage());
+                log.warn("Failed to check network CRL at {}: {}", crlUrl, e.getMessage());
             }
         }
 

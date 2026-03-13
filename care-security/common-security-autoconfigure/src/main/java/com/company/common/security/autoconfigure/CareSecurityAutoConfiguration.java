@@ -287,6 +287,7 @@ public class CareSecurityAutoConfiguration {
         CareSecurityProperties.CitizenCert certProps = properties.getCitizenCert();
         return new MoicaCertService(resourceLoader,
                 certProps.getIntermediateCertPaths(),
+                certProps.getLocalCrlPaths(),
                 certProps.isOcspEnabled(),
                 certProps.isCrlEnabled(),
                 certProps.getCrlCacheTtlHours());

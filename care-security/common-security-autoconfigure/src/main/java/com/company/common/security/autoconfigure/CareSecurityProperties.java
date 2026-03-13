@@ -130,6 +130,8 @@ public class CareSecurityProperties {
         private java.util.List<String> defaultRoles = java.util.List.of("ROLE_USER");
         private java.util.List<String> intermediateCertPaths = java.util.List.of(
                 "classpath:moica/MOICA2.cer", "classpath:moica/MOICA3.cer");
+        private java.util.List<String> localCrlPaths = java.util.List.of(
+                "classpath:moica/MOICA2-complete.crl", "classpath:moica/MOICA3-complete.crl");
         private boolean ocspEnabled = true;
         private boolean crlEnabled = true;
         private int crlCacheTtlHours = 1;
@@ -144,6 +146,8 @@ public class CareSecurityProperties {
         public void setDefaultRoles(java.util.List<String> defaultRoles) { this.defaultRoles = defaultRoles; }
         public java.util.List<String> getIntermediateCertPaths() { return intermediateCertPaths; }
         public void setIntermediateCertPaths(java.util.List<String> intermediateCertPaths) { this.intermediateCertPaths = intermediateCertPaths; }
+        public java.util.List<String> getLocalCrlPaths() { return localCrlPaths; }
+        public void setLocalCrlPaths(java.util.List<String> localCrlPaths) { this.localCrlPaths = localCrlPaths; }
         public boolean isOcspEnabled() { return ocspEnabled; }
         public void setOcspEnabled(boolean ocspEnabled) { this.ocspEnabled = ocspEnabled; }
         public boolean isCrlEnabled() { return crlEnabled; }

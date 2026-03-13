@@ -9,6 +9,7 @@ import org.springframework.core.io.ResourceLoader;
 
 import java.io.InputStream;
 import java.security.cert.CertificateFactory;
+import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,24 +23,27 @@ public class MoicaCertService {
     private static final Logger log = LoggerFactory.getLogger(MoicaCertService.class);
 
     private final List<X509Certificate> intermediateCerts;
+    private final List<X509CRL> localCrls;
     private final boolean ocspEnabled;
     private final boolean crlEnabled;
 
     public MoicaCertService(ResourceLoader resourceLoader, List<String> intermediateCertPaths,
+                            List<String> localCrlPaths,
                             boolean ocspEnabled, boolean crlEnabled, int crlCacheTtlHours) {
         this.ocspEnabled = ocspEnabled;
         this.crlEnabled = crlEnabled;
         this.intermediateCerts = loadCertificates(resourceLoader, intermediateCertPaths);
+        this.localCrls = loadCrls(resourceLoader, localCrlPaths);
         MoicaCertUtils.setCrlCacheTtlHours(crlCacheTtlHours);
-        log.info("MoicaCertService initialized: {} intermediate CAs loaded, OCSP={}, CRL={}",
-                intermediateCerts.size(), ocspEnabled, crlEnabled);
+        log.info("MoicaCertService initialized: {} intermediate CAs, {} local CRLs, OCSP={}, CRL={}",
+                intermediateCerts.size(), localCrls.size(), ocspEnabled, crlEnabled);
     }
 
     /**
      * Create a MoicaCertUtils instance for the given certificate.
      */
     public MoicaCertUtils createVerifier(X509Certificate certificate) {
-        return new MoicaCertUtils(certificate, intermediateCerts, ocspEnabled, crlEnabled);
+        return new MoicaCertUtils(certificate, intermediateCerts, localCrls, ocspEnabled, crlEnabled);
     }
 
     /**
@@ -100,5 +104,35 @@ public class MoicaCertService {
             }
         }
         return certs;
+    }
+
+    private List<X509CRL> loadCrls(ResourceLoader resourceLoader, List<String> paths) {
+        List<X509CRL> crls = new ArrayList<>();
+        if (paths == null || paths.isEmpty()) {
+            log.info("No local CRL paths configured, will rely on network CRL download");
+            return crls;
+        }
+
+        CertificateFactory cf;
+        try {
+            cf = CertificateFactory.getInstance("X.509");
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to create CertificateFactory", e);
+        }
+
+        for (String path : paths) {
+            try {
+                Resource resource = resourceLoader.getResource(path);
+                try (InputStream is = resource.getInputStream()) {
+                    X509CRL crl = (X509CRL) cf.generateCRL(is);
+                    crls.add(crl);
+                    log.info("Loaded local CRL: issuer={}, thisUpdate={}, nextUpdate={}",
+                            crl.getIssuerX500Principal(), crl.getThisUpdate(), crl.getNextUpdate());
+                }
+            } catch (Exception e) {
+                log.error("Failed to load local CRL from path: {}", path, e);
+            }
+        }
+        return crls;
     }
 }
