@@ -77,11 +77,11 @@ public class MoicaCertUtils {
 
     private final X509Certificate certificate;
     private final List<X509Certificate> intermediateCerts;
-    private final List<X509CRL> localCrls;
+    private final List<String> localCrlPaths;
     private final boolean ocspEnabled;
     private final boolean crlEnabled;
 
-    // In-memory CRL cache: URL -> CachedCrl (for network-downloaded CRLs)
+    // In-memory CRL cache: path or URL -> CachedCrl (shared for both local files and network downloads)
     private static final Map<String, CachedCrl> crlCache = new ConcurrentHashMap<>();
 
     static {
@@ -93,15 +93,16 @@ public class MoicaCertUtils {
     /**
      * @param certificate       the end-entity citizen certificate to verify
      * @param intermediateCerts the list of MOICA intermediate CA certificates (e.g., MOICA2.cer, MOICA3.cer)
-     * @param localCrls         pre-loaded local CRL files to check before downloading from network
+     * @param localCrlPaths     paths to local CRL files (file: or classpath:); read with TTL-based cache
+     *                          so external jobs can replace the file and it will be picked up automatically
      * @param ocspEnabled       whether to perform OCSP revocation checking
      * @param crlEnabled        whether to perform CRL revocation checking
      */
     public MoicaCertUtils(X509Certificate certificate, List<X509Certificate> intermediateCerts,
-                          List<X509CRL> localCrls, boolean ocspEnabled, boolean crlEnabled) {
+                          List<String> localCrlPaths, boolean ocspEnabled, boolean crlEnabled) {
         this.certificate = certificate;
         this.intermediateCerts = intermediateCerts != null ? intermediateCerts : List.of();
-        this.localCrls = localCrls != null ? localCrls : List.of();
+        this.localCrlPaths = localCrlPaths != null ? localCrlPaths : List.of();
         this.ocspEnabled = ocspEnabled;
         this.crlEnabled = crlEnabled;
     }
@@ -390,31 +391,34 @@ public class MoicaCertUtils {
 
     /**
      * Check certificate revocation via CRL.
-     * Strategy: check local CRL files first (fast, no network), then fall back to downloading
-     * from the CDP URLs in the certificate.
+     * Strategy:
+     * 1. Read local CRL files (via TTL cache) — fast, no network, picks up file updates automatically
+     * 2. Fall back to network download from the CDP URLs in the certificate
      *
      * @return true if revoked, false if not revoked
      */
     private boolean checkCrl() throws Exception {
-        // 1. Check local CRL files first (issuer must match)
-        for (X509CRL localCrl : localCrls) {
-            if (localCrl.getIssuerX500Principal().equals(certificate.getIssuerX500Principal())) {
-                if (localCrl.isRevoked(certificate)) {
-                    log.warn("Certificate is REVOKED according to local CRL (issuer={})",
-                            localCrl.getIssuerX500Principal());
-                    return true;
+        // 1. Check local CRL files first (TTL-cached reads, so updated files are picked up)
+        for (String crlPath : localCrlPaths) {
+            try {
+                X509CRL localCrl = readLocalCrl(crlPath);
+                if (localCrl.getIssuerX500Principal().equals(certificate.getIssuerX500Principal())) {
+                    if (localCrl.isRevoked(certificate)) {
+                        log.warn("Certificate is REVOKED according to local CRL: {}", crlPath);
+                        return true;
+                    }
+                    log.debug("Certificate is not revoked according to local CRL: {}", crlPath);
+                    return false;
                 }
-                log.debug("Certificate is not revoked according to local CRL (issuer={})",
-                        localCrl.getIssuerX500Principal());
-                return false;
+            } catch (Exception e) {
+                log.warn("Failed to read local CRL at {}: {}", crlPath, e.getMessage());
             }
         }
 
         // 2. Fall back to network CRL download from CDP extension
         List<String> crlUrls = getCrlDistributionPoints();
         if (crlUrls.isEmpty()) {
-            if (!localCrls.isEmpty()) {
-                // We have local CRLs but none matched the issuer — log a warning
+            if (!localCrlPaths.isEmpty()) {
                 log.warn("No matching local CRL for issuer: {}, and no CDP URLs in certificate",
                         certificate.getIssuerX500Principal());
             } else {
@@ -438,6 +442,48 @@ public class MoicaCertUtils {
         }
 
         throw new MoicaRevocationException("Failed to check any CRL distribution point");
+    }
+
+    /**
+     * Read a local CRL file with TTL-based caching.
+     * Uses the same crlCache as network CRLs, keyed by path.
+     * When the TTL expires, the file is re-read from disk — allowing an external job
+     * to replace the file and have it picked up without restarting the service.
+     */
+    private X509CRL readLocalCrl(String crlPath) throws Exception {
+        CachedCrl cached = crlCache.get(crlPath);
+        if (cached != null && !cached.isExpired()) {
+            log.debug("Using cached local CRL: {}", crlPath);
+            return cached.crl();
+        }
+
+        log.debug("Reading local CRL from: {}", crlPath);
+        // Support both classpath: and file: prefixes via Spring ResourceLoader is not available here,
+        // so we handle file: and classpath: manually
+        try (InputStream is = openCrlPath(crlPath)) {
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            X509CRL crl = (X509CRL) cf.generateCRL(is);
+            crlCache.put(crlPath, new CachedCrl(crl, System.currentTimeMillis()));
+            log.info("Local CRL loaded: path={}, issuer={}, thisUpdate={}, nextUpdate={}",
+                    crlPath, crl.getIssuerX500Principal(), crl.getThisUpdate(), crl.getNextUpdate());
+            return crl;
+        }
+    }
+
+    private InputStream openCrlPath(String crlPath) throws IOException {
+        if (crlPath.startsWith("file:")) {
+            return new java.io.FileInputStream(crlPath.substring("file:".length()));
+        } else if (crlPath.startsWith("classpath:")) {
+            String resourcePath = crlPath.substring("classpath:".length());
+            InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath);
+            if (is == null) {
+                throw new IOException("Classpath resource not found: " + resourcePath);
+            }
+            return is;
+        } else {
+            // Treat as a plain file path
+            return new java.io.FileInputStream(crlPath);
+        }
     }
 
     /**
