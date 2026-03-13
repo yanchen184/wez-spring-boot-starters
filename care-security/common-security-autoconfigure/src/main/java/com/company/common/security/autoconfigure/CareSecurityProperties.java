@@ -131,7 +131,7 @@ public class CareSecurityProperties {
         private java.util.List<String> intermediateCertPaths = java.util.List.of(
                 "classpath:moica/MOICA2.cer", "classpath:moica/MOICA3.cer");
         private java.util.List<String> localCrlPaths = java.util.List.of(
-                "classpath:moica/MOICA2-complete.crl", "classpath:moica/MOICA3-complete.crl");
+                "file:/opt/moica/MOICA2-complete.crl", "file:/opt/moica/MOICA3-complete.crl");
         private boolean ocspEnabled = true;
         private boolean crlEnabled = true;
         private int crlCacheTtlHours = 1;
