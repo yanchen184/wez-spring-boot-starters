@@ -2,6 +2,7 @@ package com.company.common.security.test;
 
 import com.company.common.security.cert.LoginTokenService;
 import com.company.common.security.cert.MoicaCertService;
+import com.company.common.security.cert.MoicaCertUtils;
 import com.company.common.security.cert.CitizenCertUserSyncService;
 import com.company.common.security.entity.SaUser;
 import com.company.common.security.repository.SaUserRepository;
@@ -29,10 +30,15 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.*;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -520,10 +526,213 @@ class Phase13_CitizenCertTest {
     }
 
     // =========================================================================
+    // 13.7 CRL Revocation Logic (MoicaCertUtils)
+    // =========================================================================
+
+    @Nested
+    @DisplayName("13.7 CRL Revocation Logic")
+    class CrlRevocationLogic {
+
+        @Test
+        @DisplayName("Should not be revoked when no local CRLs and CRL disabled")
+        void shouldNotBeRevokedWhenCrlDisabled() throws Exception {
+            KeyPair keyPair = generateTestKeyPair();
+            X509Certificate cert = generateSelfSignedCertBC(keyPair, "CN=Test,O=MOICA,C=TW");
+
+            MoicaCertUtils verifier = new MoicaCertUtils(cert, List.of(), List.of(), false, false);
+            assertThat(verifier.isRevoked()).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should use local CRL when issuer matches, and return not-revoked for valid cert")
+        void shouldUseLocalCrlWhenIssuerMatches() throws Exception {
+            // Generate a CA key pair (acts as issuer)
+            KeyPair caKeyPair = generateTestKeyPair();
+            X509Certificate caCert = generateSelfSignedCertBC(caKeyPair, "CN=TestCA,O=MOICA,C=TW");
+
+            // Generate end-entity cert signed by CA
+            KeyPair eeKeyPair = generateTestKeyPair();
+            X509Certificate eeCert = generateCertSignedBy(eeKeyPair, caKeyPair, caCert,
+                    "CN=EndEntity,O=MOICA,C=TW");
+
+            // Build an empty CRL (no revoked certs) issued by the CA
+            X509CRL emptyCrl = generateEmptyCrl(caKeyPair, caCert);
+
+            // Write CRL to temp file
+            Path crlFile = Files.createTempFile("test-crl-", ".crl");
+            Files.write(crlFile, emptyCrl.getEncoded());
+
+            try {
+                MoicaCertUtils.clearCrlCache();
+                MoicaCertUtils verifier = new MoicaCertUtils(
+                        eeCert, List.of(caCert), List.of("file:" + crlFile.toAbsolutePath()), false, true);
+
+                assertThat(verifier.isRevoked()).isFalse();
+            } finally {
+                Files.deleteIfExists(crlFile);
+            }
+        }
+
+        @Test
+        @DisplayName("Should detect revoked certificate from local CRL")
+        void shouldDetectRevokedCertFromLocalCrl() throws Exception {
+            KeyPair caKeyPair = generateTestKeyPair();
+            X509Certificate caCert = generateSelfSignedCertBC(caKeyPair, "CN=TestCA,O=MOICA,C=TW");
+
+            KeyPair eeKeyPair = generateTestKeyPair();
+            X509Certificate eeCert = generateCertSignedBy(eeKeyPair, caKeyPair, caCert,
+                    "CN=RevokedUser,O=MOICA,C=TW");
+
+            // Build a CRL that revokes the end-entity cert
+            X509CRL crlWithRevoked = generateCrlWithRevoked(caKeyPair, caCert, eeCert.getSerialNumber());
+
+            Path crlFile = Files.createTempFile("test-crl-revoked-", ".crl");
+            Files.write(crlFile, crlWithRevoked.getEncoded());
+
+            try {
+                MoicaCertUtils.clearCrlCache();
+                MoicaCertUtils verifier = new MoicaCertUtils(
+                        eeCert, List.of(caCert), List.of("file:" + crlFile.toAbsolutePath()), false, true);
+
+                assertThat(verifier.isRevoked()).isTrue();
+            } finally {
+                Files.deleteIfExists(crlFile);
+            }
+        }
+
+        @Test
+        @DisplayName("Should re-read local CRL file after cache is cleared (simulates file update by job)")
+        void shouldReReadCrlAfterCacheCleared() throws Exception {
+            KeyPair caKeyPair = generateTestKeyPair();
+            X509Certificate caCert = generateSelfSignedCertBC(caKeyPair, "CN=TestCA,O=MOICA,C=TW");
+
+            KeyPair eeKeyPair = generateTestKeyPair();
+            X509Certificate eeCert = generateCertSignedBy(eeKeyPair, caKeyPair, caCert,
+                    "CN=UpdatedUser,O=MOICA,C=TW");
+
+            // First CRL: empty (cert is valid)
+            X509CRL emptyCrl = generateEmptyCrl(caKeyPair, caCert);
+            Path crlFile = Files.createTempFile("test-crl-update-", ".crl");
+            Files.write(crlFile, emptyCrl.getEncoded());
+
+            String crlPath = "file:" + crlFile.toAbsolutePath();
+
+            try {
+                MoicaCertUtils.clearCrlCache();
+
+                MoicaCertUtils verifier1 = new MoicaCertUtils(
+                        eeCert, List.of(caCert), List.of(crlPath), false, true);
+                assertThat(verifier1.isRevoked()).isFalse();
+
+                // Simulate job replacing CRL file with one that revokes the cert
+                X509CRL updatedCrl = generateCrlWithRevoked(caKeyPair, caCert, eeCert.getSerialNumber());
+                Files.write(crlFile, updatedCrl.getEncoded());
+
+                // Clear cache to simulate TTL expiry
+                MoicaCertUtils.clearCrlCache();
+
+                MoicaCertUtils verifier2 = new MoicaCertUtils(
+                        eeCert, List.of(caCert), List.of(crlPath), false, true);
+                assertThat(verifier2.isRevoked()).isTrue();
+            } finally {
+                Files.deleteIfExists(crlFile);
+            }
+        }
+
+        @Test
+        @DisplayName("Should skip local CRL when issuer does not match (no false positives)")
+        void shouldSkipLocalCrlWhenIssuerDoesNotMatch() throws Exception {
+            // Cert issued by CA-A
+            KeyPair caAKeyPair = generateTestKeyPair();
+            X509Certificate caACert = generateSelfSignedCertBC(caAKeyPair, "CN=CA-A,O=MOICA,C=TW");
+            KeyPair eeKeyPair = generateTestKeyPair();
+            X509Certificate eeCert = generateCertSignedBy(eeKeyPair, caAKeyPair, caACert,
+                    "CN=User,O=MOICA,C=TW");
+
+            // CRL issued by CA-B (different issuer)
+            KeyPair caBKeyPair = generateTestKeyPair();
+            X509Certificate caBCert = generateSelfSignedCertBC(caBKeyPair, "CN=CA-B,O=OTHER,C=TW");
+            X509CRL caBCrl = generateCrlWithRevoked(caBKeyPair, caBCert, eeCert.getSerialNumber());
+
+            Path crlFile = Files.createTempFile("test-crl-mismatch-", ".crl");
+            Files.write(crlFile, caBCrl.getEncoded());
+
+            try {
+                MoicaCertUtils.clearCrlCache();
+                // No matching local CRL, CRL enabled but no CDP in self-signed cert → returns false
+                MoicaCertUtils verifier = new MoicaCertUtils(
+                        eeCert, List.of(caACert), List.of("file:" + crlFile.toAbsolutePath()), false, true);
+
+                // Issuer mismatch: local CRL skipped, no CDP URL → not revoked
+                assertThat(verifier.isRevoked()).isFalse();
+            } finally {
+                Files.deleteIfExists(crlFile);
+            }
+        }
+    }
+
+    // =========================================================================
     // Test Helpers
     // =========================================================================
 
     record CertLoginRequestDto(String loginToken, String base64Data) {}
+
+    /**
+     * Generate a certificate signed by the given CA key pair.
+     */
+    static X509Certificate generateCertSignedBy(KeyPair eeKeyPair, KeyPair caKeyPair,
+                                                 X509Certificate caCert, String subjectDn) throws Exception {
+        X500Name issuer = new X500Name(caCert.getSubjectX500Principal().getName());
+        X500Name subject = new X500Name(subjectDn);
+        BigInteger serial = BigInteger.valueOf(System.currentTimeMillis());
+        Date notBefore = new Date(System.currentTimeMillis() - 86400000L);
+        Date notAfter = new Date(System.currentTimeMillis() + 365L * 86400000L);
+
+        X509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(
+                issuer, serial, notBefore, notAfter, subject, eeKeyPair.getPublic());
+
+        ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA")
+                .setProvider(BouncyCastleProvider.PROVIDER_NAME)
+                .build(caKeyPair.getPrivate());
+
+        return new JcaX509CertificateConverter()
+                .setProvider(BouncyCastleProvider.PROVIDER_NAME)
+                .getCertificate(certBuilder.build(signer));
+    }
+
+    /**
+     * Generate an empty CRL (no revoked certificates) issued by the given CA.
+     */
+    static X509CRL generateEmptyCrl(KeyPair caKeyPair, X509Certificate caCert) throws Exception {
+        return generateCrlWithRevoked(caKeyPair, caCert, null);
+    }
+
+    /**
+     * Generate a CRL issued by the given CA, optionally revoking a specific serial number.
+     */
+    static X509CRL generateCrlWithRevoked(KeyPair caKeyPair, X509Certificate caCert,
+                                           java.math.BigInteger revokedSerial) throws Exception {
+        X500Name issuerName = new X500Name(caCert.getSubjectX500Principal().getName());
+        Date thisUpdate = new Date();
+        Date nextUpdate = new Date(System.currentTimeMillis() + 86400000L);
+
+        org.bouncycastle.cert.X509v2CRLBuilder crlBuilder =
+                new org.bouncycastle.cert.X509v2CRLBuilder(issuerName, thisUpdate);
+        crlBuilder.setNextUpdate(nextUpdate);
+
+        if (revokedSerial != null) {
+            crlBuilder.addCRLEntry(revokedSerial, thisUpdate,
+                    org.bouncycastle.asn1.x509.CRLReason.keyCompromise);
+        }
+
+        ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA")
+                .setProvider(BouncyCastleProvider.PROVIDER_NAME)
+                .build(caKeyPair.getPrivate());
+
+        byte[] crlBytes = crlBuilder.build(signer).getEncoded();
+        return (X509CRL) CertificateFactory.getInstance("X.509")
+                .generateCRL(new java.io.ByteArrayInputStream(crlBytes));
+    }
 
     static KeyPair generateTestKeyPair() throws NoSuchAlgorithmException {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
