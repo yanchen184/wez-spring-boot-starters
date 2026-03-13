@@ -16,6 +16,9 @@ public interface SaUserRepository extends JpaRepository<SaUser, Long> {
 
     Optional<SaUser> findByCitizenId(String citizenId);
 
+    @Query("SELECT u FROM SaUser u WHERE u.cname = :cname AND u.last4Idno = :last4Idno")
+    Optional<SaUser> findByCnameAndLast4Idno(@Param("cname") String cname, @Param("last4Idno") String last4Idno);
+
     @Query("SELECT u FROM SaUser u " +
            "LEFT JOIN FETCH u.userRoles ur " +
            "LEFT JOIN FETCH ur.role " +

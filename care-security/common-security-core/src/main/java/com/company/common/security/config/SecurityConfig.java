@@ -51,7 +51,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/captcha").permitAll()
                         .requestMatchers("/api/auth/refresh").permitAll()
                         .requestMatchers("/api/auth/otp/verify").permitAll()
-                        .requestMatchers("/api/auth/cert/challenge", "/api/auth/cert/login").permitAll()
+                        .requestMatchers("/api/auth/cert/challenge", "/api/auth/cert/login", "/api/auth/cert/login-token").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()
                         .requestMatchers("/api/auth/switch-user").hasRole("ADMIN")
                         .requestMatchers("/api/auth/exit-switch-user").authenticated()

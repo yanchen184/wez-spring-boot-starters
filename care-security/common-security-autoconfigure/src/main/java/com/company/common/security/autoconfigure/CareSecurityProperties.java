@@ -128,6 +128,11 @@ public class CareSecurityProperties {
         private int challengeExpireSeconds = 300;
         private boolean autoCreateUser = true;
         private java.util.List<String> defaultRoles = java.util.List.of("ROLE_USER");
+        private java.util.List<String> intermediateCertPaths = java.util.List.of(
+                "classpath:moica/MOICA2.cer", "classpath:moica/MOICA3.cer");
+        private boolean ocspEnabled = true;
+        private boolean crlEnabled = true;
+        private int crlCacheTtlHours = 1;
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -137,5 +142,13 @@ public class CareSecurityProperties {
         public void setAutoCreateUser(boolean autoCreateUser) { this.autoCreateUser = autoCreateUser; }
         public java.util.List<String> getDefaultRoles() { return defaultRoles; }
         public void setDefaultRoles(java.util.List<String> defaultRoles) { this.defaultRoles = defaultRoles; }
+        public java.util.List<String> getIntermediateCertPaths() { return intermediateCertPaths; }
+        public void setIntermediateCertPaths(java.util.List<String> intermediateCertPaths) { this.intermediateCertPaths = intermediateCertPaths; }
+        public boolean isOcspEnabled() { return ocspEnabled; }
+        public void setOcspEnabled(boolean ocspEnabled) { this.ocspEnabled = ocspEnabled; }
+        public boolean isCrlEnabled() { return crlEnabled; }
+        public void setCrlEnabled(boolean crlEnabled) { this.crlEnabled = crlEnabled; }
+        public int getCrlCacheTtlHours() { return crlCacheTtlHours; }
+        public void setCrlCacheTtlHours(int crlCacheTtlHours) { this.crlCacheTtlHours = crlCacheTtlHours; }
     }
 }

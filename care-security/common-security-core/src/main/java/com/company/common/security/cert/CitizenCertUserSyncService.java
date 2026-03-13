@@ -1,5 +1,6 @@
 package com.company.common.security.cert;
 
+import com.company.common.security.cert.exception.MoicaUserNotFoundException;
 import com.company.common.security.entity.Organize;
 import com.company.common.security.entity.Role;
 import com.company.common.security.entity.SaUser;
@@ -13,10 +14,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Synchronizes citizen certificate user information to the local database.
- * On first cert login, creates a local user record with citizenId as username.
+ * <p>
+ * Supports two lookup strategies:
+ * 1. By citizenId (legacy, backward compatible)
+ * 2. By cname (Subject CN) + last4IDNO (from certificate extension OID 2.16.886.1.100.1.1)
+ * <p>
+ * On first cert login, creates a local user record.
  * On subsequent logins, returns the existing user.
  */
 public class CitizenCertUserSyncService {
@@ -42,13 +49,70 @@ public class CitizenCertUserSyncService {
     }
 
     /**
-     * Sync citizen cert user to local DB. Creates if not exists by citizenId.
+     * Sync citizen cert user to local DB by citizenId. Creates if not exists.
+     * (Legacy method, kept for backward compatibility)
      */
     @Transactional
     public SaUser syncUser(String citizenId, String displayName) {
         return saUserRepository.findByCitizenId(citizenId)
                 .map(existing -> updateExistingUser(existing, displayName))
                 .orElseGet(() -> createNewUser(citizenId, displayName));
+    }
+
+    /**
+     * Lookup user by cname (Subject CN) and last4IDNO (from MOICA cert extension).
+     * This is the primary lookup method for MOICA PKCS#7 login flow.
+     *
+     * @param cname      the Subject CN from the certificate (person's name)
+     * @param last4IDNO  the last 4 digits of the national ID from the certificate extension
+     * @param citizenId  the full citizen ID (if available from CN), used as fallback
+     * @return the matched or newly created SaUser
+     * @throws MoicaUserNotFoundException if autoCreate is disabled and user not found
+     */
+    @Transactional
+    public SaUser syncUserByCnameAndIdno(String cname, String last4IDNO, String citizenId) {
+        // Strategy 1: try citizenId lookup first (most precise)
+        if (citizenId != null && !citizenId.isBlank()) {
+            Optional<SaUser> byCitizenId = saUserRepository.findByCitizenId(citizenId);
+            if (byCitizenId.isPresent()) {
+                return updateExistingUser(byCitizenId.get(), cname);
+            }
+        }
+
+        // Strategy 2: try cname + last4IDNO lookup
+        if (cname != null && last4IDNO != null) {
+            Optional<SaUser> byCnameAndIdno = saUserRepository.findByCnameAndLast4Idno(cname, last4IDNO);
+            if (byCnameAndIdno.isPresent()) {
+                SaUser user = byCnameAndIdno.get();
+                // Bind citizenId if not already set
+                if (citizenId != null && user.getCitizenId() == null) {
+                    user.setCitizenId(citizenId);
+                }
+                return updateExistingUser(user, cname);
+            }
+        }
+
+        // Strategy 3: auto-create new user
+        String effectiveId = (citizenId != null && !citizenId.isBlank()) ? citizenId : generateUsername(cname, last4IDNO);
+        log.info("Creating new citizen cert user: cname={}, last4IDNO={}, effectiveId={}",
+                cname, last4IDNO, effectiveId);
+        SaUser newUser = createNewUser(effectiveId, cname);
+        if (last4IDNO != null) {
+            newUser.setLast4Idno(last4IDNO);
+            saUserRepository.save(newUser);
+        }
+        return newUser;
+    }
+
+    private String generateUsername(String cname, String last4IDNO) {
+        String base = "CERT_";
+        if (cname != null) {
+            base += cname.replaceAll("\\s+", "");
+        }
+        if (last4IDNO != null) {
+            base += "_" + last4IDNO;
+        }
+        return base;
     }
 
     private SaUser updateExistingUser(SaUser user, String displayName) {

@@ -3,17 +3,13 @@ package com.company.common.security.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
-@Schema(description = "POST /api/auth/cert/login — Citizen certificate login request")
+@Schema(description = "POST /api/auth/cert/login — MOICA citizen certificate login request (PKCS#7)")
 public record CertLoginRequest(
-        @NotBlank(message = "Challenge ID is required")
-        @Schema(description = "Challenge ID from GET /api/auth/cert/challenge")
-        String challengeId,
+        @NotBlank(message = "Login token is required")
+        @Schema(description = "Login token from GET /api/auth/cert/login-token")
+        String loginToken,
 
-        @NotBlank(message = "Certificate is required")
-        @Schema(description = "Base64-encoded X.509 certificate (DER format)")
-        String certificate,
-
-        @NotBlank(message = "Signature is required")
-        @Schema(description = "Base64-encoded digital signature of the challenge nonce")
-        String signature
+        @NotBlank(message = "PKCS#7 signed data is required")
+        @Schema(description = "Base64-encoded PKCS#7 (CMS) SignedData containing the certificate, signature, and CardSN")
+        String base64Data
 ) {}

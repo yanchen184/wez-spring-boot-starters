@@ -35,6 +35,14 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Bouncy Castle for PKCS#7 test helpers -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>1.79</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

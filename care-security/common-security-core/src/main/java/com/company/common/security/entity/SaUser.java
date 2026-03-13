@@ -79,6 +79,9 @@ public class SaUser extends AuditableEntity {
     @Column(name = "CITIZEN_ID", length = 10, unique = true)
     private String citizenId;
 
+    @Column(name = "LAST4_IDNO", length = 4)
+    private String last4Idno;
+
     /** @deprecated Legacy extensible field from Grails, no longer used. */
     @Column(name = "VALUE_1", length = 500)
     @Deprecated
@@ -159,6 +162,8 @@ public class SaUser extends AuditableEntity {
     public void setOtpEnabled(Boolean otpEnabled) { this.otpEnabled = otpEnabled; }
     public String getCitizenId() { return citizenId; }
     public void setCitizenId(String citizenId) { this.citizenId = citizenId; }
+    public String getLast4Idno() { return last4Idno; }
+    public void setLast4Idno(String last4Idno) { this.last4Idno = last4Idno; }
     public Set<SaUserOrgRole> getUserRoles() { return userRoles; }
     public void setUserRoles(Set<SaUserOrgRole> userRoles) { this.userRoles = userRoles; }
     public List<PwdHistory> getPwdHistories() { return pwdHistories; }

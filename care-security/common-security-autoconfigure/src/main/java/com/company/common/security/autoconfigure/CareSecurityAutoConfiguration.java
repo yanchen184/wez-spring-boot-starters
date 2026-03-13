@@ -31,6 +31,8 @@ import com.company.common.security.cert.CertChallengeService;
 import com.company.common.security.cert.CertVerificationService;
 import com.company.common.security.cert.CitizenCertController;
 import com.company.common.security.cert.CitizenCertUserSyncService;
+import com.company.common.security.cert.LoginTokenService;
+import com.company.common.security.cert.MoicaCertService;
 import com.company.common.security.otp.OtpController;
 import com.company.common.security.otp.OtpService;
 import com.company.common.security.otp.TotpService;
@@ -77,6 +79,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 import java.util.function.Supplier;
+import org.springframework.core.io.ResourceLoader;
 
 @AutoConfiguration
 @ConditionalOnProperty(prefix = "care.security", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -243,20 +246,50 @@ public class CareSecurityAutoConfiguration {
 
     // ===== Citizen Certificate =====
 
+    /**
+     * @deprecated Kept for backward compatibility. New code should use {@link LoginTokenService}.
+     */
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "care.security.citizen-cert", name = "enabled", havingValue = "true")
+    @Deprecated
     public CertChallengeService certChallengeService(RedisTemplate<String, Object> redisTemplate,
                                                       CareSecurityProperties properties) {
         return new CertChallengeService(redisTemplate,
                 properties.getCitizenCert().getChallengeExpireSeconds());
     }
 
+    /**
+     * @deprecated Kept for backward compatibility. New code should use {@link MoicaCertService}.
+     */
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "care.security.citizen-cert", name = "enabled", havingValue = "true")
+    @Deprecated
     public CertVerificationService certVerificationService() {
         return new CertVerificationService();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "care.security.citizen-cert", name = "enabled", havingValue = "true")
+    public LoginTokenService loginTokenService(RedisTemplate<String, Object> redisTemplate,
+                                                CareSecurityProperties properties) {
+        return new LoginTokenService(redisTemplate,
+                properties.getCitizenCert().getChallengeExpireSeconds());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "care.security.citizen-cert", name = "enabled", havingValue = "true")
+    public MoicaCertService moicaCertService(ResourceLoader resourceLoader,
+                                              CareSecurityProperties properties) {
+        CareSecurityProperties.CitizenCert certProps = properties.getCitizenCert();
+        return new MoicaCertService(resourceLoader,
+                certProps.getIntermediateCertPaths(),
+                certProps.isOcspEnabled(),
+                certProps.isCrlEnabled(),
+                certProps.getCrlCacheTtlHours());
     }
 
     @Bean
@@ -275,12 +308,12 @@ public class CareSecurityAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(prefix = "care.security.citizen-cert", name = "enabled", havingValue = "true")
-    public CitizenCertController citizenCertController(CertChallengeService certChallengeService,
-                                                        CertVerificationService certVerificationService,
+    public CitizenCertController citizenCertController(LoginTokenService loginTokenService,
+                                                        MoicaCertService moicaCertService,
                                                         CitizenCertUserSyncService citizenCertUserSyncService,
                                                         AuthService authService,
                                                         AuditService auditService) {
-        return new CitizenCertController(certChallengeService, certVerificationService,
+        return new CitizenCertController(loginTokenService, moicaCertService,
                 citizenCertUserSyncService, authService, auditService);
     }
 

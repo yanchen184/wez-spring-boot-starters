@@ -57,6 +57,10 @@ care:
       auto-create-user: true
       default-roles:
         - ROLE_USER
+      intermediate-cert-paths: []
+      ocsp-enabled: false
+      crl-enabled: false
+      crl-cache-ttl-hours: 1
 
 care-test:
   admin-password: "Admin@123"
