@@ -26,22 +26,21 @@ public class CaptchaController {
 
     @Operation(summary = "Generate CAPTCHA", description = "Returns a captcha ID and base64-encoded PNG image")
     @GetMapping("/captcha")
-    public ResponseEntity<ApiResponse<CaptchaResponse>> generateCaptcha() {
+    public CaptchaResponse generateCaptcha() {
         CaptchaService.CaptchaResult result = captchaService.generateCaptcha();
-        return ResponseEntity.ok(ApiResponse.ok(new CaptchaResponse(result.captchaId(), result.imageBase64())));
+        return new CaptchaResponse(result.captchaId(), result.imageBase64());
     }
 
     @Operation(summary = "Get CAPTCHA audio", description = "Returns a WAV audio base64 for accessibility")
     @GetMapping("/captcha/audio/{captchaId}")
-    public ResponseEntity<ApiResponse<CaptchaAudioResponse>> getCaptchaAudio(
-            @PathVariable String captchaId) {
+    public ResponseEntity<?> getCaptchaAudio(@PathVariable String captchaId) {
         if (!captchaService.isAudioEnabled()) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(404).body(ApiResponse.error("Audio CAPTCHA is not enabled"));
         }
 
         String audioBase64 = captchaService.generateAudioBase64(captchaId);
         if (audioBase64 == null) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(404).body(ApiResponse.error("CAPTCHA not found or expired"));
         }
 
         return ResponseEntity.ok(ApiResponse.ok(new CaptchaAudioResponse(audioBase64)));

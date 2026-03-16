@@ -369,18 +369,21 @@ class Phase10_OrgPermissionTest {
         }
 
         @Test
-        @DisplayName("10.20 GET /api/users without orgId returns all users (backward compatible)")
+        @DisplayName("10.20 GET /api/users returns paged result with content array")
         @Transactional
         void testFindAllWithoutOrgFilter() throws Exception {
             mockMvc.perform(get("/api/users")
                             .header("Authorization", "Bearer " + adminAccessToken))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.data").isArray());
+                    .andExpect(jsonPath("$.data.content").isArray())
+                    .andExpect(jsonPath("$.data.page").value(0))
+                    .andExpect(jsonPath("$.data.size").value(20))
+                    .andExpect(jsonPath("$.data.totalElements").isNumber());
         }
 
         @Test
-        @DisplayName("10.21 GET /api/users?orgId=1 returns only users in that org")
+        @DisplayName("10.21 GET /api/users?orgId=1 returns paged users in that org")
         @Transactional
         void testFindAllWithOrgFilter() throws Exception {
             mockMvc.perform(get("/api/users")
@@ -388,19 +391,20 @@ class Phase10_OrgPermissionTest {
                             .header("Authorization", "Bearer " + adminAccessToken))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.data").isArray());
+                    .andExpect(jsonPath("$.data.content").isArray());
         }
 
         @Test
-        @DisplayName("10.22 GET /api/users?orgId=99999 returns empty list")
+        @DisplayName("10.22 GET /api/users?orgId=99999 returns empty paged result")
         @Transactional
         void testFindAllWithNonExistentOrg() throws Exception {
             mockMvc.perform(get("/api/users")
                             .param("orgId", "99999")
                             .header("Authorization", "Bearer " + adminAccessToken))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data").isArray())
-                    .andExpect(jsonPath("$.data").isEmpty());
+                    .andExpect(jsonPath("$.data.content").isArray())
+                    .andExpect(jsonPath("$.data.content").isEmpty())
+                    .andExpect(jsonPath("$.data.totalElements").value(0));
         }
     }
 

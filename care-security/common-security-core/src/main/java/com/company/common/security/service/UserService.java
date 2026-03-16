@@ -1,5 +1,6 @@
 package com.company.common.security.service;
 
+import com.company.common.response.dto.PageResponse;
 import com.company.common.security.dto.request.AssignOrgRoleRequest;
 import com.company.common.security.dto.request.CreateUserRequest;
 import com.company.common.security.dto.request.UpdateUserRequest;
@@ -12,11 +13,16 @@ import com.company.common.security.repository.OrganizeRepository;
 import com.company.common.security.repository.RoleRepository;
 import com.company.common.security.repository.SaUserOrgRoleRepository;
 import com.company.common.security.repository.SaUserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 
 public class UserService {
@@ -57,7 +63,6 @@ public class UserService {
         if (orgId == null) {
             return findAll();
         }
-        // Filter users who have at least one org-role in the specified organization
         List<SaUserOrgRole> orgRoles = saUserOrgRoleRepository.findByOrganizeObjid(orgId);
         return orgRoles.stream()
                 .map(SaUserOrgRole::getSaUser)
@@ -65,6 +70,39 @@ public class UserService {
                 .map(this::toResponse)
                 .toList();
     }
+
+    /**
+     * 分頁搜尋使用者
+     *
+     * @param keyword     模糊搜尋（username / cname / email），null 或空字串表示不篩選
+     * @param orgId       機構 ID，null 表示查全部
+     * @param pageRequest 分頁參數（page / size / sortBy / sortDir）
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<UserResponse> search(String keyword, Long orgId,
+                                              com.company.common.response.dto.PageRequest pageRequest) {
+        String safeSortBy = (pageRequest.getSortBy() != null && SORTABLE_FIELDS.contains(pageRequest.getSortBy()))
+                ? pageRequest.getSortBy() : DEFAULT_SORT_FIELD;
+        Sort sort = pageRequest.isDescending()
+                ? Sort.by(safeSortBy).descending()
+                : Sort.by(safeSortBy).ascending();
+
+        Pageable pageable = PageRequest.of(pageRequest.safePage(), pageRequest.safeSize(), sort);
+
+        Page<SaUser> result = (orgId != null)
+                ? saUserRepository.searchUsersByOrg(orgId, keyword, pageable)
+                : saUserRepository.searchUsers(keyword, pageable);
+
+        List<UserResponse> content = result.getContent().stream()
+                .map(this::toResponse)
+                .toList();
+        return PageResponse.of(content, result.getNumber(), result.getSize(), result.getTotalElements());
+    }
+
+    private static final String DEFAULT_SORT_FIELD = "username";
+    private static final Set<String> SORTABLE_FIELDS = Set.of(
+            "username", "cname", "email", "enabled", "lastLoginTime", "accountLocked"
+    );
 
     @Transactional(readOnly = true)
     public UserResponse findById(Long id) {

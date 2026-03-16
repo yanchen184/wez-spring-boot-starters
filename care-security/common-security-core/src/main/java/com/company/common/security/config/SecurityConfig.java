@@ -48,7 +48,7 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/auth/login").permitAll()
-                        .requestMatchers("/api/auth/captcha").permitAll()
+                        .requestMatchers("/api/auth/captcha", "/api/auth/captcha/audio/**").permitAll()
                         .requestMatchers("/api/auth/refresh").permitAll()
                         .requestMatchers("/api/auth/otp/verify").permitAll()
                         .requestMatchers("/api/auth/cert/challenge", "/api/auth/cert/login", "/api/auth/cert/login-token").permitAll()

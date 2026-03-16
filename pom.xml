@@ -120,6 +120,8 @@
                     <version>3.14.0</version>
                     <configuration>
                         <release>${java.version}</release>
+                        <!-- Spring Boot 4.x 需要 -parameters 才能正確解析 @PathVariable / @RequestParam 參數名 -->
+                        <parameters>true</parameters>
                     </configuration>
                 </plugin>
                 <plugin>

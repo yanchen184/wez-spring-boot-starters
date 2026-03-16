@@ -40,66 +40,60 @@ public class AuthController {
 
     @Operation(summary = "Login", description = "Authenticate with username/password and receive JWT tokens")
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<TokenResponse>> login(
+    public TokenResponse login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
         String ipAddress = getClientIp(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
-        TokenResponse token = authService.login(request, ipAddress, userAgent);
-        return ResponseEntity.ok(ApiResponse.ok("Login successful", token));
+        return authService.login(request, ipAddress, userAgent);
     }
 
     @Operation(summary = "Refresh token", description = "Exchange a valid refresh token for a new access token")
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<TokenResponse>> refresh(
+    public TokenResponse refresh(
             @Valid @RequestBody RefreshTokenRequest request) {
-        TokenResponse token = authService.refresh(request.refreshToken());
-        return ResponseEntity.ok(ApiResponse.ok("Token refreshed", token));
+        return authService.refresh(request.refreshToken());
     }
 
     @Operation(summary = "Logout", description = "Invalidate refresh token")
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(@RequestBody LogoutRequest request) {
+    public void logout(@RequestBody LogoutRequest request) {
         authService.logout(request.refreshToken());
-        return ResponseEntity.ok(ApiResponse.ok("Logged out successfully", null));
     }
 
     @Operation(summary = "Change password", description = "Change the authenticated user's password")
     @PostMapping("/change-password")
-    public ResponseEntity<ApiResponse<Void>> changePassword(
+    public void changePassword(
             @Valid @RequestBody ChangePasswordRequest request,
             Authentication authentication) {
         authService.changePassword(authentication.getName(), request);
-        return ResponseEntity.ok(ApiResponse.ok("Password changed successfully", null));
     }
 
     @Operation(summary = "Get current user info", description = "Returns user profile, roles, org roles, and CRUD permissions")
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UserInfoResponse>> me(Authentication authentication) {
+    public UserInfoResponse me(Authentication authentication) {
         Jwt jwt = ((JwtAuthenticationToken) authentication).getToken();
         Long currentOrgId = jwt.hasClaim("currentOrgId") ? jwt.getClaim("currentOrgId") : null;
         CustomUserDetails details = authService.getUserInfo(authentication.getName(), currentOrgId);
-        return ResponseEntity.ok(ApiResponse.ok(UserInfoResponse.from(details)));
+        return UserInfoResponse.from(details);
     }
 
     @Operation(summary = "Get my organizations", description = "List all organizations the current user belongs to")
     @GetMapping("/my-orgs")
-    public ResponseEntity<ApiResponse<List<MyOrgResponse>>> getMyOrgs(Authentication authentication) {
-        List<MyOrgResponse> orgs = authService.getMyOrgs(authentication.getName());
-        return ResponseEntity.ok(ApiResponse.ok(orgs));
+    public List<MyOrgResponse> getMyOrgs(Authentication authentication) {
+        return authService.getMyOrgs(authentication.getName());
     }
 
     @Operation(summary = "Switch user (impersonate)", description = "Admin impersonates another user. Requires ROLE_ADMIN.")
     @PostMapping("/switch-user")
-    public ResponseEntity<ApiResponse<TokenResponse>> switchUser(
+    public TokenResponse switchUser(
             @Valid @RequestBody SwitchUserRequest request,
             Authentication authentication,
             HttpServletRequest httpRequest) {
         String ipAddress = getClientIp(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
-        TokenResponse token = authService.switchUser(
+        return authService.switchUser(
                 authentication.getName(), request.username(), request.orgId(), ipAddress, userAgent);
-        return ResponseEntity.ok(ApiResponse.ok("Switched to user: " + request.username(), token));
     }
 
     @Operation(summary = "Exit switch user", description = "Return to the original admin account after impersonation")
@@ -117,7 +111,7 @@ public class AuthController {
         String userAgent = httpRequest.getHeader("User-Agent");
         String currentUser = authentication.getName();
         TokenResponse token = authService.exitSwitchUser(impersonatedBy, currentUser, ipAddress, userAgent);
-        return ResponseEntity.ok(ApiResponse.ok("Returned to admin: " + impersonatedBy, token));
+        return ResponseEntity.ok(ApiResponse.ok(token));
     }
 
     private String getClientIp(HttpServletRequest request) {

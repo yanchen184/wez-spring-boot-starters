@@ -431,12 +431,14 @@ class Phase12_CaptchaTest {
     class AudioCaptcha {
 
         @Test
-        @DisplayName("audio endpoint returns 404 when audioEnabled is false (default)")
+        @DisplayName("audio endpoint returns 404 with error message when audioEnabled is false")
         void audioDisabled_returns404() throws Exception {
             CaptchaService.CaptchaResult result = captchaService.generateCaptcha();
 
             mockMvc.perform(get("/api/auth/captcha/audio/" + result.captchaId()))
-                    .andExpect(status().isNotFound());
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.message").value("Audio CAPTCHA is not enabled"));
         }
 
         @Test

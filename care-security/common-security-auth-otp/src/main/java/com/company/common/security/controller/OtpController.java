@@ -39,9 +39,9 @@ public class OtpController {
 
     @Operation(summary = "Setup OTP", description = "Generate a new TOTP secret for the authenticated user. Returns secret and QR code URI.")
     @PostMapping("/setup")
-    public ResponseEntity<ApiResponse<OtpSetupResponse>> setup(Authentication authentication) {
+    public OtpSetupResponse setup(Authentication authentication) {
         OtpSetupResult result = otpService.setupOtp(authentication.getName());
-        return ResponseEntity.ok(ApiResponse.ok(new OtpSetupResponse(result.secret(), result.otpAuthUri())));
+        return new OtpSetupResponse(result.secret(), result.otpAuthUri());
     }
 
     @Operation(summary = "Verify OTP setup", description = "Verify the code from authenticator app and enable OTP for the user.")
@@ -53,7 +53,7 @@ public class OtpController {
         if (!valid) {
             return ResponseEntity.badRequest().body(ApiResponse.error("Invalid OTP code"));
         }
-        return ResponseEntity.ok(ApiResponse.ok("OTP enabled successfully", null));
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
     @Operation(summary = "Verify OTP during login",
@@ -71,14 +71,13 @@ public class OtpController {
         String ipAddress = getClientIp(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
         TokenResponse token = authService.completeOtpLogin(request.username(), ipAddress, userAgent);
-        return ResponseEntity.ok(ApiResponse.ok("OTP verified", token));
+        return ResponseEntity.ok(ApiResponse.ok(token));
     }
 
     @Operation(summary = "Disable OTP", description = "Disable OTP for the authenticated user.")
     @DeleteMapping
-    public ResponseEntity<ApiResponse<Void>> disable(Authentication authentication) {
+    public void disable(Authentication authentication) {
         otpService.disableOtp(authentication.getName());
-        return ResponseEntity.ok(ApiResponse.ok("OTP disabled", null));
     }
 
     private String getClientIp(HttpServletRequest request) {

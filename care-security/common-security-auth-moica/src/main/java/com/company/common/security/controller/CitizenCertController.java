@@ -1,6 +1,5 @@
 package com.company.common.security.controller;
 
-import com.company.common.response.dto.ApiResponse;
 import com.company.common.security.exception.MoicaLoginException;
 import com.company.common.security.service.CitizenCertUserSyncService;
 import com.company.common.security.service.LoginTokenService;
@@ -19,7 +18,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -66,15 +64,15 @@ public class CitizenCertController {
     @Operation(summary = "Get login token",
             description = "Generate a random login token for the client to sign with their citizen certificate via PKCS#7.")
     @GetMapping("/login-token")
-    public ResponseEntity<ApiResponse<LoginTokenResponse>> getLoginToken() {
+    public LoginTokenResponse getLoginToken() {
         String loginToken = loginTokenService.generateLoginToken();
-        return ResponseEntity.ok(ApiResponse.ok(new LoginTokenResponse(loginToken)));
+        return new LoginTokenResponse(loginToken);
     }
 
     @Operation(summary = "Login with citizen certificate (PKCS#7)",
             description = "Authenticate by providing the loginToken and base64-encoded PKCS#7 signed data.")
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<TokenResponse>> login(
+    public TokenResponse login(
             @Valid @RequestBody CertLoginRequest request,
             HttpServletRequest httpRequest) {
 
@@ -138,8 +136,7 @@ public class CitizenCertController {
             auditService.logEvent("LOGIN_CERT", username, null, ipAddress, userAgent,
                     String.format("MOICA cert login: cname=%s, certSN=%s, cardSN=%s", cname, certSN, cardSN));
 
-            TokenResponse token = authService.completeCertLogin(username, ipAddress, userAgent);
-            return ResponseEntity.ok(ApiResponse.ok("Certificate login successful", token));
+            return authService.completeCertLogin(username, ipAddress, userAgent);
 
         } catch (MoicaLoginException e) {
             // Re-throw as-is (it extends BadCredentialsException)
