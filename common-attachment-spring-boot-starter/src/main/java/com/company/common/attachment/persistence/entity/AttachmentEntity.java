@@ -36,7 +36,7 @@ public class AttachmentEntity extends BaseEntity {
     @Column(nullable = false, length = 500)
     private String originalFilename;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false)
     private String storedFilename;
 
     @Column(length = 20)
@@ -45,7 +45,7 @@ public class AttachmentEntity extends BaseEntity {
     @Column(length = 500)
     private String displayName;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false)
     private String mimeType;
 
     @Column(nullable = false)
