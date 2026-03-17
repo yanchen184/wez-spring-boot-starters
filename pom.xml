@@ -20,8 +20,11 @@
         <module>common-log-spring-boot-starter</module>
         <module>common-jpa-spring-boot-starter</module>
         <module>common-response-spring-boot-starter</module>
+        <module>common-attachment-spring-boot-starter</module>
         <!-- 安全模組（依賴上面三個） -->
         <module>care-security</module>
+        <!-- 報表模組 -->
+        <module>common-report</module>
     </modules>
 
     <properties>
@@ -106,6 +109,35 @@
             <dependency>
                 <groupId>com.company.common</groupId>
                 <artifactId>common-security-auth-captcha</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- ========== Attachment Module ========== -->
+            <dependency>
+                <groupId>com.company.common</groupId>
+                <artifactId>common-attachment-spring-boot-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- ========== Report Module ========== -->
+            <dependency>
+                <groupId>com.company.common</groupId>
+                <artifactId>common-report-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.company.common</groupId>
+                <artifactId>common-report-engine-easyexcel</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.company.common</groupId>
+                <artifactId>common-report-autoconfigure</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.company.common</groupId>
+                <artifactId>common-report-spring-boot-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>
