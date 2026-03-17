@@ -1,0 +1,2 @@
+com.company.common.report.autoconfigure.ReportAutoConfiguration
+com.company.common.report.autoconfigure.ReportAsyncConfiguration

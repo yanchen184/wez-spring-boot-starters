@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.company.common</groupId>
+        <artifactId>common-report</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>common-report-autoconfigure</artifactId>
+    <name>common-report-autoconfigure</name>
+    <description>Common Report Auto Configuration</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.company.common</groupId>
+            <artifactId>common-report-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot</artifactId>
+        </dependency>
+
+        <!-- common-jpa (for AuditableEntity, transitive from core) -->
+        <dependency>
+            <groupId>com.company.common</groupId>
+            <artifactId>common-jpa-spring-boot-starter</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- common-response (for ApiResponse, BusinessException in ReportController) -->
+        <dependency>
+            <groupId>com.company.common</groupId>
+            <artifactId>common-response-spring-boot-starter</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Web support (for ReportController) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Validation (for @Valid in ReportController) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- SpringDoc OpenAPI (for @Tag, @Operation in ReportController) -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>3.0.2</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- JPA support (for @EntityScan) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-autoconfigure-processor</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
+                    <annotationProcessorPathsUseDepMgmt>true</annotationProcessorPathsUseDepMgmt>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
