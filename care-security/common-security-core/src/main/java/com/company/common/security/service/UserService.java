@@ -1,5 +1,6 @@
 package com.company.common.security.service;
 
+import com.company.common.response.dto.PageRequest;
 import com.company.common.response.dto.PageResponse;
 import com.company.common.security.dto.request.AssignOrgRoleRequest;
 import com.company.common.security.dto.request.CreateUserRequest;
@@ -14,7 +15,6 @@ import com.company.common.security.repository.RoleRepository;
 import com.company.common.security.repository.SaUserOrgRoleRepository;
 import com.company.common.security.repository.SaUserRepository;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,6 +26,11 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 public class UserService {
+
+    private static final String DEFAULT_SORT_FIELD = "username";
+    private static final Set<String> SORTABLE_FIELDS = Set.of(
+            "username", "cname", "email", "enabled", "lastLoginTime", "accountLocked"
+    );
 
     private final SaUserRepository saUserRepository;
     private final RoleRepository roleRepository;
@@ -80,14 +85,15 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public PageResponse<UserResponse> search(String keyword, Long orgId,
-                                              com.company.common.response.dto.PageRequest pageRequest) {
+                                              PageRequest pageRequest) {
         String safeSortBy = (pageRequest.getSortBy() != null && SORTABLE_FIELDS.contains(pageRequest.getSortBy()))
                 ? pageRequest.getSortBy() : DEFAULT_SORT_FIELD;
         Sort sort = pageRequest.isDescending()
                 ? Sort.by(safeSortBy).descending()
                 : Sort.by(safeSortBy).ascending();
 
-        Pageable pageable = PageRequest.of(pageRequest.safePage(), pageRequest.safeSize(), sort);
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                pageRequest.safePage(), pageRequest.safeSize(), sort);
 
         Page<SaUser> result = (orgId != null)
                 ? saUserRepository.searchUsersByOrg(orgId, keyword, pageable)
@@ -98,11 +104,6 @@ public class UserService {
                 .toList();
         return PageResponse.of(content, result.getNumber(), result.getSize(), result.getTotalElements());
     }
-
-    private static final String DEFAULT_SORT_FIELD = "username";
-    private static final Set<String> SORTABLE_FIELDS = Set.of(
-            "username", "cname", "email", "enabled", "lastLoginTime", "accountLocked"
-    );
 
     @Transactional(readOnly = true)
     public UserResponse findById(Long id) {

@@ -1,5 +1,6 @@
 package com.company.common.security.controller;
 
+import com.company.common.response.dto.PageRequest;
 import com.company.common.response.dto.PageResponse;
 import com.company.common.security.dto.request.AssignOrgRoleRequest;
 import com.company.common.security.dto.request.CreateUserRequest;
@@ -45,7 +46,7 @@ public class UserController {
             @RequestParam(required = false) String keyword,
             @Parameter(description = "機構 ID（篩選指定機構的使用者）")
             @RequestParam(required = false) Long orgId,
-            com.company.common.response.dto.PageRequest pageRequest) {
+            PageRequest pageRequest) {
         return userService.search(keyword, orgId, pageRequest);
     }
 
