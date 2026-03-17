@@ -13,7 +13,7 @@
 | [common-log-spring-boot-starter](common-log-spring-boot-starter/) | 統一日誌 | API 自動記錄 `-->` / `<--`、traceId 追蹤、敏感遮罩、慢 API 告警 |
 | [common-response-spring-boot-starter](common-response-spring-boot-starter/) | 統一回應 | 自動包裝 `ApiResponse`、全局異常處理、錯誤碼體系 |
 | [common-jpa-spring-boot-starter](common-jpa-spring-boot-starter/) | JPA 通用 | 自動審計（建立/修改時間+操作人）、可選軟刪除 |
-| [care-security](care-security/) | 安全模組 | 認證授權、JWT、RBAC、LDAP、OTP、CAPTCHA |
+| [care-security](care-security/) | 安全模組 | 認證授權、JWT、RBAC、LDAP、OTP、CAPTCHA（含 TTS 無障礙） |
 | [starter-showcase](https://github.com/yanchen184/starter-showcase) | 展示專案 | 獨立 repo，體驗所有 starter 的效果 |
 
 ---
@@ -127,7 +127,7 @@
 ✅ RBAC 角色權限控制
 ✅ LDAP 整合（可選）
 ✅ OTP / TOTP 兩步驟驗證（可選）
-✅ CAPTCHA 驗證碼（可選）
+✅ CAPTCHA 驗證碼 + TTS 語音無障礙（可選）
 ```
 
 ### 場景 C：微服務只需要日誌
@@ -218,7 +218,7 @@ public class Product extends AuditableEntity {
 | RBAC | 角色 → 權限，支援組織層級 |
 | LDAP | 整合 OpenLDAP（可選） |
 | OTP / TOTP | 兩步驟驗證（可選） |
-| CAPTCHA | 圖形驗證碼（可選） |
+| CAPTCHA | 圖形驗證碼 + TTS 語音無障礙（可選） |
 | 密碼策略 | 可配置的密碼強度規則 |
 
 ---
@@ -247,6 +247,16 @@ common:
     enabled: true
     exclude-paths:
       - /actuator/**
+
+# 安全模組 — CAPTCHA
+care:
+  security:
+    captcha:
+      enabled: true              # 啟用圖形驗證碼
+      include-letters: true      # true = 數字+英文，false = 純數字（預設）
+      audio-enabled: true        # 啟用 TTS 語音驗證碼（無障礙）
+      length: 4                  # 驗證碼長度
+      expire-seconds: 300        # 有效期
 ```
 
 ---
@@ -305,6 +315,10 @@ company-common-starters/
 └── care-security/                       ← 安全模組
     ├── common-security-core/
     ├── common-security-autoconfigure/
+    ├── common-security-auth-captcha/    ← CAPTCHA 圖形+TTS 語音驗證碼
+    ├── common-security-auth-moica/      ← 自然人憑證 PKCS#7
+    ├── common-security-auth-ldap/       ← LDAP 認證
+    ├── common-security-auth-otp/        ← TOTP 雙因素驗證
     ├── common-security-spring-boot-starter/
     └── common-security-test/
 ```
@@ -327,4 +341,4 @@ mvn versions:commit
   - common-log-spring-boot-starter：Filter + Interceptor API 日誌、Micrometer Tracing、敏感遮罩
   - common-response-spring-boot-starter：ApiResponse 自動包裝、全局異常處理、錯誤碼體系
   - common-jpa-spring-boot-starter：自動審計、軟刪除、SoftDeleteRepository
-  - care-security：JWT 認證、RBAC、LDAP、OTP、CAPTCHA、密碼策略
+  - care-security：JWT 認證、RBAC、LDAP、OTP、CAPTCHA（含 TTS 語音無障礙）、自然人憑證、密碼策略
