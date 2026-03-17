@@ -6,13 +6,13 @@
 
 ## 功能總覽
 
-- **上傳** — Tika 偵測真實 MIME type、檔案大小限制、副檔名黑名單、路徑穿越防護
+- **上傳** — Tika 偵測真實 MIME type、檔案大小限制、副檔名黑名單（26 種）、路徑穿越防護、雙重副檔名攻擊防護
 - **下載** — streaming 串流，不吃 heap
 - **軟刪除** — 繼承 `BaseEntity`，搭配 `SoftDeleteRepository`
 - **儲存策略** — filesystem / database blob 可切換（`@ConditionalOnProperty`）
 - **存取控制** — `AttachmentAccessPolicy` 介面，消費端必須實作
-- **圖片壓縮** — 上傳後異步壓縮（`@Async` + `@TransactionalEventListener`，Thumbnailator）
-- **事件驅動** — `AttachmentUploadedEvent` / `AttachmentDeletedEvent`
+- **圖片壓縮** — 上傳後異步壓縮（`@TransactionalEventListener`，Thumbnailator），壓縮後自動更新 DB fileSize
+- **事件驅動** — `AttachmentUploadedEvent` / `AttachmentDeletedEvent`（傳 ID，不傳 Entity）
 
 ---
 
@@ -38,14 +38,23 @@ public class MyAttachmentAccessPolicy implements AttachmentAccessPolicy {
 
     @Override
     public boolean canAccess(AttachmentEntity attachment) {
-        // 根據 SecurityContext 判斷是否可存取
-        return true;
+        // 登入即可存取
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.isAuthenticated()
+                && !"anonymousUser".equals(auth.getPrincipal());
     }
 
     @Override
     public boolean canDelete(AttachmentEntity attachment) {
-        // 根據 SecurityContext 判斷是否可刪除
-        return hasRole("ADMIN");
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) return false;
+
+        // 上傳者本人可刪
+        if (auth.getName().equals(attachment.getCreatedBy())) return true;
+
+        // ADMIN 可刪
+        return auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
     }
 }
 ```
@@ -65,7 +74,17 @@ wez:
       - text/plain
 ```
 
-### 4. 使用 AttachmentService
+### 4. 啟用異步（圖片壓縮需要）
+
+```java
+@SpringBootApplication
+@EnableAsync          // ← 加這個，圖片壓縮才會異步執行
+public class MyApplication { ... }
+```
+
+> Starter 不會自動啟用 `@EnableAsync`，避免影響整個應用。
+
+### 5. 使用 AttachmentService
 
 ```java
 @RestController
@@ -112,18 +131,61 @@ public class MyController {
 
 ## 上傳 Pipeline
 
-每次上傳強制經過以下驗證，不可跳過：
+每次上傳強制經過以下流程，不可跳過：
 
 ```
 Request
-  → PathTraversalGuard        (order=50，路徑安全)
-  → FileSizeValidator          (order=100，大小限制)
-  → MimeTypeValidator          (order=200，Tika 偵測真實 MIME)
+  → readAllBytes()             (讀入 byte[]，避免 stream 被 Tika 消耗後截斷)
+  → Tika.detect()              (偵測真實 MIME type，不信任 client)
+  → PathTraversalGuard         (order=50，路徑安全 + 副檔名黑名單 + 雙重副檔名防護)
+  → FileSizeValidator          (order=100，用實際 byte[] 大小驗證，非宣告值)
+  → MimeTypeValidator          (order=200，case-insensitive 比對白名單)
   → StorageStrategy.store()    (存檔)
   → Persistence                (寫 DB)
-  → AttachmentUploadedEvent    (異步圖片壓縮)
+  → AttachmentUploadedEvent    (commit 後觸發，異步圖片壓縮)
   → Response
 ```
+
+---
+
+## 安全防護
+
+### MIME 偵測
+
+用 Apache Tika 讀取檔案的 **magic bytes** 判斷真實類型，不看副檔名。
+
+```
+virus.exe 改名成 photo.jpg → Tika 偵測為 application/x-dosexec → 拒絕
+```
+
+MIME 比對為 **case-insensitive**（`image/JPEG` 等同 `image/jpeg`）。
+
+### 副檔名黑名單（26 種）
+
+```
+.exe .bat .cmd .sh .ps1 .vbs .js .jar .war .class
+.msi .dll .so .py .rb .php .asp .aspx .jsp .cgi
+.com .scr .pif .hta .wsf .mjs
+```
+
+### 雙重副檔名攻擊防護
+
+```
+malware.exe.pdf → 檢測到 .exe. 在中間 → 拒絕
+```
+
+不只檢查結尾，也檢查檔名中間是否包含 `.blocked_ext.`。
+
+### 其他防護
+
+- **路徑穿越** — 拒絕 `..`、`/`、`\`
+- **Null byte** — 拒絕 `\0`
+- **Trailing dot** — 拒絕 `file.exe.`（Windows 會自動移除結尾 `.`，繞過檢查）
+- **儲存層** — `Path.normalize()` + `startsWith` 二次檢查
+
+### 檔案大小驗證
+
+用 **實際讀取的 byte[] 大小** 驗證，不信任 client 宣告的 `fileSize`。即使 caller 傳 `fileSize=0`，真正的檔案大小仍會被檢查。
 
 ---
 
@@ -173,6 +235,7 @@ wez:
 
 - 存入 `AttachmentBlobEntity`，`@Lob @Basic(fetch = LAZY)` 延遲載入
 - 適合不方便掛 NFS/S3 的環境
+- 注意：大檔案會全量載入 heap，建議搭配較小的 `max-file-size`
 
 ### 自訂儲存策略
 
@@ -182,11 +245,11 @@ wez:
 @Component
 public class S3StorageStrategy implements AttachmentStorageStrategy {
     @Override
-    public StorageResult store(String filename, InputStream is) { ... }
+    public StorageResult store(String filename, InputStream is) throws IOException { ... }
     @Override
-    public InputStream load(String storedFilename) { ... }
+    public InputStream load(String storedFilename) throws IOException { ... }
     @Override
-    public void delete(String storedFilename) { ... }
+    public void delete(String storedFilename) throws IOException { ... }
     @Override
     public StorageType getStorageType() { return StorageType.FILESYSTEM; }
 }
@@ -210,7 +273,7 @@ AttachmentEntity extends BaseEntity
 ├── extension (String)
 ├── displayName (String)
 ├── mimeType (String)        ← Tika 偵測結果
-├── fileSize (Long)
+├── fileSize (Long)          ← 實際大小（壓縮後會自動更新）
 └── storageType (StorageType) ← FILESYSTEM / DATABASE
 ```
 
@@ -230,19 +293,33 @@ AttachmentEntity extends BaseEntity
 
 ## 事件
 
-| 事件 | 觸發時機 | 用途 |
-|------|---------|------|
-| `AttachmentUploadedEvent` | 上傳成功後（commit 後） | 圖片壓縮、通知、索引 |
-| `AttachmentDeletedEvent` | 軟刪除成功後 | 清理、通知 |
+事件只傳 ID 和基本資訊，**不傳 JPA Entity**，避免 detached entity 問題。
+
+| 事件 | 欄位 | 觸發時機 | 用途 |
+|------|------|---------|------|
+| `AttachmentUploadedEvent` | `attachmentId`, `storedFilename`, `mimeType`, `fileSize` | 上傳成功後（commit 後） | 圖片壓縮、通知、索引 |
+| `AttachmentDeletedEvent` | `attachmentId`, `storedFilename` | 軟刪除成功後 | 清理、通知 |
 
 監聽範例：
 
 ```java
 @TransactionalEventListener(phase = AFTER_COMMIT)
 public void onUploaded(AttachmentUploadedEvent event) {
-    log.info("附件已上傳: {}", event.getAttachment().getOriginalFilename());
+    log.info("附件已上傳: id={}, mimeType={}", event.getAttachmentId(), event.getMimeType());
 }
 ```
+
+---
+
+## 圖片壓縮
+
+- 使用 Thumbnailator，支援 JPEG / PNG / GIF / BMP / WebP
+- 上傳成功 commit 後，由 `@TransactionalEventListener` 異步觸發
+- 小於 `compression-threshold`（預設 500KB）不壓縮
+- 壓縮後如果沒變小，保留原檔
+- 壓縮後自動更新 DB 的 `fileSize`
+
+**前提：** 消費端必須在 `@SpringBootApplication` 上加 `@EnableAsync`。
 
 ---
 
@@ -260,6 +337,7 @@ common-attachment-spring-boot-starter/
 │   │
 │   ├── core/                                       ← 核心業務
 │   │   ├── AttachmentService.java                  # 主 facade：upload/download/softDelete/findByOwner/findById
+│   │   │                                           # upload 先 readAllBytes() 再分別給 Tika 偵測和 storage 存檔
 │   │   ├── AttachmentNotFoundException.java        # 附件不存在例外
 │   │   ├── AttachmentAccessDeniedException.java    # 無權存取例外
 │   │   └── model/                                  ← DTO（全部 record）
@@ -277,13 +355,14 @@ common-attachment-spring-boot-starter/
 │   │
 │   ├── validation/                                 ← 驗證 pipeline（強制執行，不可跳過）
 │   │   ├── AttachmentValidator.java                # interface：validate(request) + getOrder()
-│   │   ├── PathTraversalGuard.java                 # order=50，路徑穿越 + 危險副檔名檢查
-│   │   ├── FileSizeValidator.java                  # order=100，檔案大小限制
-│   │   ├── MimeTypeValidator.java                  # order=200，Tika 偵測真實 MIME type + 白名單比對
+│   │   ├── PathTraversalGuard.java                 # order=50，路徑穿越 + 26 種危險副檔名 + 雙重副檔名 + trailing dot
+│   │   ├── FileSizeValidator.java                  # order=100，用實際 byte[] 大小驗證
+│   │   ├── MimeTypeValidator.java                  # order=200，Tika 偵測 + case-insensitive 白名單比對
 │   │   └── AttachmentValidationException.java      # 驗證失敗例外
 │   │
 │   ├── processing/                                 ← 後處理
-│   │   └── ImageProcessingService.java             # @Async + @TransactionalEventListener，Thumbnailator 壓縮
+│   │   └── ImageProcessingService.java             # @TransactionalEventListener + @Async，Thumbnailator 壓縮
+│   │                                               # 壓縮後更新 DB fileSize，用 ID 載入 entity 避免 detached 問題
 │   │
 │   ├── security/                                   ← 存取控制
 │   │   ├── AttachmentAccessPolicy.java             # interface：canAccess / canDelete（消費端實作）
@@ -302,9 +381,9 @@ common-attachment-spring-boot-starter/
 │   │                                               # POST /attachments, GET /attachments/{id},
 │   │                                               # GET /attachments/{id}/download, DELETE /attachments/{id}
 │   │
-│   └── event/                                      ← Spring Application Event
-│       ├── AttachmentUploadedEvent.java            # 上傳成功後發布（commit 後觸發圖片壓縮）
-│       └── AttachmentDeletedEvent.java             # 軟刪除後發布
+│   └── event/                                      ← Spring Application Event（傳 ID，不傳 Entity）
+│       ├── AttachmentUploadedEvent.java            # attachmentId, storedFilename, mimeType, fileSize
+│       └── AttachmentDeletedEvent.java             # attachmentId, storedFilename
 │
 ├── src/main/resources/META-INF/spring/
 │   └── org.springframework.boot.autoconfigure.AutoConfiguration.imports
@@ -333,6 +412,27 @@ common-attachment-spring-boot-starter/
 | MIME 偵測 | Apache Tika 3.2.3 |
 | 圖片壓縮 | Thumbnailator 0.4.20 |
 | 依賴 | `common-jpa-spring-boot-starter`（BaseEntity, SoftDeleteRepository） |
+| 前提 | 消費端需 `@EnableAsync`（圖片壓縮用） |
+
+---
+
+## 設計決策
+
+### 為什麼先 readAllBytes()？
+
+Tika 偵測 MIME type 時會消耗 stream 的前 N 個 bytes。如果用 `BufferedInputStream` + `mark/reset`，超過 buffer size 的檔案會截斷。先讀成 `byte[]` 再分別建 `ByteArrayInputStream` 是最安全的做法。
+
+### 為什麼 Event 傳 ID 不傳 Entity？
+
+`@TransactionalEventListener(AFTER_COMMIT)` 在 commit 後執行，此時原本的 persistence context 已關閉。如果傳 entity，`@Async` handler 在另一個 thread 存取 lazy 屬性會拋 `LazyInitializationException`。傳 ID 讓 handler 自己開 `@Transactional` 重新載入。
+
+### 為什麼不在 Starter 裡加 @EnableAsync？
+
+`@EnableAsync` 是全域設定，會影響整個應用的行為。Starter 不應該偷偷改變消費端的全域配置。
+
+### 為什麼預設 Deny？
+
+每個專案的權限規則不同（同單位才能看 vs 登入就能看 vs ADMIN 才能看）。如果預設 Allow，消費端忘記實作就是安全漏洞。預設 Deny + WARN log 提醒，確保不會默默放行。
 
 ---
 
@@ -341,8 +441,10 @@ common-attachment-spring-boot-starter/
 - 1.0.0
   - 上傳/下載/軟刪除/依 owner 查詢
   - Filesystem / Database BLOB 雙儲存策略
-  - 強制驗證 pipeline（Tika MIME + 大小 + 路徑穿越）
-  - AttachmentAccessPolicy 存取控制
-  - 圖片異步壓縮（Thumbnailator）
-  - Spring Application Event
+  - 強制驗證 pipeline（Tika MIME + 實際大小 + 路徑穿越 + 26 種副檔名黑名單 + 雙重副檔名防護）
+  - MIME 比對 case-insensitive
+  - AttachmentAccessPolicy 存取控制（預設全拒絕）
+  - 圖片異步壓縮（Thumbnailator），壓縮後自動更新 DB fileSize
+  - Event 傳 ID 不傳 Entity，避免 detached entity
+  - 不自動啟用 @EnableAsync，不影響消費端全域配置
   - 30 個測試（單元 + H2 整合）
