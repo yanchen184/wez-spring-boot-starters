@@ -12,11 +12,11 @@ import org.springframework.data.redis.core.RedisTemplate;
 /**
  * Auto-configuration for captcha (圖形驗證碼) support.
  *
- * Activated when: care.security.captcha.enabled=true
+ * 引入 jar 即自動啟用；設 care.security.captcha.enabled=false 可關閉。
  */
 @AutoConfiguration
 @EnableConfigurationProperties(CareSecurityProperties.class)
-@ConditionalOnProperty(prefix = "care.security.captcha", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "care.security.captcha", name = "enabled", matchIfMissing = true)
 public class CaptchaAutoConfiguration {
 
     @Bean

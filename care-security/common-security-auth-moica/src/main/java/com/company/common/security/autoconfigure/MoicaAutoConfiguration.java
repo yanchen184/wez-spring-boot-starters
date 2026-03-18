@@ -21,7 +21,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 /**
  * Auto-configuration for MOICA citizen digital certificate (自然人憑證) authentication.
  *
- * Activated when: care.security.citizen-cert.enabled=true
+ * 引入 jar 即自動啟用；設 care.security.citizen-cert.enabled=false 可關閉。
  *
  * Usage (without full starter):
  * <pre>
@@ -37,7 +37,7 @@ import org.springframework.data.redis.core.RedisTemplate;
  */
 @AutoConfiguration
 @EnableConfigurationProperties(CareSecurityProperties.class)
-@ConditionalOnProperty(prefix = "care.security.citizen-cert", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "care.security.citizen-cert", name = "enabled", matchIfMissing = true)
 public class MoicaAutoConfiguration {
 
     @Bean

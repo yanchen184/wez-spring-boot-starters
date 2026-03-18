@@ -17,11 +17,11 @@ import org.springframework.context.annotation.Bean;
 /**
  * Auto-configuration for LDAP authentication.
  *
- * Activated when: care.security.ldap.enabled=true
+ * 引入 jar 即自動啟用；設 care.security.ldap.enabled=false 可關閉。
  */
 @AutoConfiguration
 @EnableConfigurationProperties(CareSecurityProperties.class)
-@ConditionalOnProperty(prefix = "care.security.ldap", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "care.security.ldap", name = "enabled", matchIfMissing = true)
 public class LdapAutoConfiguration {
 
     @Bean

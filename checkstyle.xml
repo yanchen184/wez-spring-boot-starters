@@ -1,0 +1,160 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+  care-security Checkstyle 規則
+  設計原則：擋真正有害的問題，不擋風格偏好。
+  基準：Google Java Style Guide 精簡版（移除 Javadoc 強制要求）
+-->
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="error"/>
+    <property name="fileExtensions" value="java"/>
+
+    <!-- ===== 檔案層級 ===== -->
+
+    <!-- 檔案結尾必須有換行 -->
+    <module name="NewlineAtEndOfFile"/>
+
+    <!-- 禁止 Tab（統一用空格） -->
+    <module name="FileTabCharacter">
+        <property name="eachLine" value="true"/>
+    </module>
+
+    <!-- 行長度上限 150（考量到 Spring 的長 annotation） -->
+    <module name="LineLength">
+        <property name="max" value="150"/>
+        <!-- 忽略 import、package、URL -->
+        <property name="ignorePattern" value="^(import|package).*|.*https?://.*"/>
+    </module>
+
+    <!-- 啟用 @SuppressWarnings("checkstyle:RuleName") 支援 -->
+    <module name="SuppressWarningsFilter"/>
+
+    <module name="TreeWalker">
+        <module name="SuppressWarningsHolder"/>
+
+        <!-- ===== Import ===== -->
+
+        <!-- 禁止 wildcard import：import java.util.* -->
+        <module name="AvoidStarImport"/>
+
+        <!-- 禁止 unused import -->
+        <module name="UnusedImports"/>
+
+        <!-- 禁止重複 import -->
+        <module name="RedundantImport"/>
+
+        <!-- ===== 命名規範 ===== -->
+
+        <!-- Class 名：大駝峰 -->
+        <module name="TypeName"/>
+
+        <!-- 方法名：小駝峰 -->
+        <module name="MethodName"/>
+
+        <!-- 變數名：小駝峰 -->
+        <module name="LocalVariableName"/>
+        <module name="MemberName"/>
+        <module name="ParameterName"/>
+
+        <!-- 常數：全大寫 + 底線，例如 MAX_ATTEMPTS
+             允許：
+             - log/logger（SLF4J 業界慣例）
+             - 小駝峰的 static final 工具物件（AntPathMatcher、ObjectMapper 等框架慣例） -->
+        <module name="ConstantName">
+            <property name="format" value="^log(ger)?$|^[a-z][a-zA-Z0-9]*$|^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"/>
+        </module>
+
+        <!-- static non-final 欄位：小駝峰 -->
+        <module name="StaticVariableName"/>
+
+        <!-- ===== 程式碼品質 ===== -->
+
+        <!-- 禁止空 catch block（吞掉 exception 是最常見的 bug 來源） -->
+        <module name="EmptyCatchBlock">
+            <property name="exceptionVariableName" value="ignored|expected"/>
+        </module>
+
+        <!-- 禁止空 block（if/else/try/finally 不能是空的） -->
+        <module name="EmptyBlock">
+            <property name="option" value="TEXT"/>
+            <property name="tokens" value="LITERAL_TRY,LITERAL_FINALLY,LITERAL_IF,LITERAL_ELSE"/>
+        </module>
+
+        <!-- 禁止多餘的分號 -->
+        <module name="EmptyStatement"/>
+
+        <!-- 禁止多餘的 import（java.lang） -->
+        <module name="IllegalImport"/>
+
+        <!-- switch 必須有 default -->
+        <module name="MissingSwitchDefault"/>
+
+        <!-- switch case fall-through 必須有 // fall through 註解 -->
+        <module name="FallThrough"/>
+
+        <!-- 禁止字串用 == 比較（應用 equals） -->
+        <module name="StringLiteralEquality"/>
+
+        <!-- UnnecessaryParentheses 故意不加：
+             lambda 括號是偏好問題，Security DSL 的 method chain 也常被誤報 -->
+
+        <!-- 禁止修改 for-loop 的控制變數 -->
+        <module name="ModifiedControlVariable"/>
+
+        <!-- 方法長度上限 80 行（超過要考慮拆分） -->
+        <module name="MethodLength">
+            <property name="max" value="80"/>
+            <property name="countEmpty" value="false"/>
+        </module>
+
+        <!-- 方法參數上限 7 個
+             只擋一般方法，排除：
+             - CTOR_DEF：Record / data class constructor 參數數量取決於欄位
+             - @Bean factory method：Spring DI 注入所有依賴是正常模式（見 AutoConfiguration） -->
+        <module name="ParameterNumber">
+            <property name="max" value="7"/>
+            <property name="ignoreOverriddenMethods" value="true"/>
+            <property name="tokens" value="METHOD_DEF"/>
+            <!-- Spring @Bean factory methods 在 AutoConfiguration 中注入大量依賴是正常的 -->
+            <property name="ignoreAnnotatedBy" value="org.springframework.context.annotation.Bean"/>
+        </module>
+
+        <!-- ===== 大括號風格 ===== -->
+
+        <!-- if/for/while 必須有大括號 -->
+        <module name="NeedBraces"/>
+
+        <!-- LeftCurly 故意不加：
+             Spring 常見 one-liner interface extends JpaRepository<X,Long> {}
+             強制換行會造成大量誤報，交給 IDE formatter 處理即可 -->
+
+        <!-- 右大括號位置 -->
+        <module name="RightCurly"/>
+
+        <!-- ===== 空白 ===== -->
+
+        <!-- 操作符前後要有空格：a + b，不能是 a+b -->
+        <module name="WhitespaceAround">
+            <!-- 允許空 block：{} -->
+            <property name="allowEmptyConstructors" value="true"/>
+            <property name="allowEmptyMethods" value="true"/>
+            <property name="allowEmptyTypes" value="true"/>
+            <property name="allowEmptyLoops" value="true"/>
+        </module>
+
+        <!-- 逗號後要有空格 -->
+        <module name="WhitespaceAfter"/>
+
+        <!-- 不能有行尾空白 -->
+        <module name="Regexp">
+            <property name="format" value="[ \t]+$"/>
+            <property name="illegalPattern" value="true"/>
+            <property name="message" value="Trailing whitespace"/>
+        </module>
+
+    </module>
+</module>

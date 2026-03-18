@@ -15,11 +15,11 @@ import org.springframework.context.annotation.Bean;
 /**
  * Auto-configuration for TOTP / OTP two-factor authentication.
  *
- * Activated when: care.security.otp.enabled=true
+ * 引入 jar 即自動啟用；設 care.security.otp.enabled=false 可關閉。
  */
 @AutoConfiguration
 @EnableConfigurationProperties(CareSecurityProperties.class)
-@ConditionalOnProperty(prefix = "care.security.otp", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "care.security.otp", name = "enabled", matchIfMissing = true)
 public class OtpAutoConfiguration {
 
     @Bean
