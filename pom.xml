@@ -37,7 +37,6 @@
         <!-- Static Analysis -->
         <checkstyle.version>3.6.0</checkstyle.version>
         <spotbugs.version>4.9.8.2</spotbugs.version>
-        <error-prone.version>2.36.0</error-prone.version>
         <!-- 從 company-build-tools jar 的 classpath 讀取規則檔 -->
         <checkstyle.config>checkstyle.xml</checkstyle.config>
         <spotbugs.excludeFilter>spotbugs-exclude.xml</spotbugs.excludeFilter>
@@ -266,45 +265,4 @@
         </plugins>
     </build>
 
-    <!-- ===== Error Prone Profile ===== -->
-    <!-- 用法：mvn compile -Perror-prone -pl common-report/common-report-core -->
-    <!-- 因為 annotationProcessorPaths 不能跨模組合併，所以用 profile 隔離 -->
-    <profiles>
-        <profile>
-            <id>error-prone</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-compiler-plugin</artifactId>
-                        <configuration>
-                            <fork>true</fork>
-                            <compilerArgs>
-                                <arg>-XDcompilePolicy=simple</arg>
-                                <arg>-Xplugin:ErrorProne</arg>
-                                <arg>-XDshould-stop.ifError=FLOW</arg>
-                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
-                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
-                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
-                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
-                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
-                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
-                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
-                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
-                                <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
-                                <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
-                            </compilerArgs>
-                            <annotationProcessorPaths>
-                                <path>
-                                    <groupId>com.google.errorprone</groupId>
-                                    <artifactId>error_prone_core</artifactId>
-                                    <version>${error-prone.version}</version>
-                                </path>
-                            </annotationProcessorPaths>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 </project>
