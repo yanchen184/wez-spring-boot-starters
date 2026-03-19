@@ -63,10 +63,15 @@ public class PivotConfig {
     /**
      * 值欄位設定
      *
-     * @param columnName Excel 欄位名稱（header 文字）
-     * @param function   彙總函數（SUM, COUNT, AVERAGE 等）
+     * @param columnName   Excel 欄位名稱（header 文字）
+     * @param function     彙總函數（SUM, COUNT, AVERAGE 等）
+     * @param displayLabel Pivot Table 顯示的欄位名稱（null 時使用 columnName）
      */
-    public record ValueField(String columnName, ConsolidateFunction function) {
+    public record ValueField(String columnName, ConsolidateFunction function, String displayLabel) {
+
+        public String resolveLabel() {
+            return displayLabel != null ? displayLabel : columnName;
+        }
     }
 
     /**
@@ -110,15 +115,21 @@ public class PivotConfig {
             return this;
         }
 
-        /** 加入值欄位（預設 SUM） */
+        /** 加入值欄位（預設 SUM，label 同欄位名） */
         public Builder value(String columnName) {
-            this.valueFields.add(new ValueField(columnName, ConsolidateFunction.SUM));
+            this.valueFields.add(new ValueField(columnName, ConsolidateFunction.SUM, null));
             return this;
         }
 
-        /** 加入值欄位（指定函數） */
+        /** 加入值欄位（指定函數，label 同欄位名） */
         public Builder value(String columnName, ConsolidateFunction function) {
-            this.valueFields.add(new ValueField(columnName, function));
+            this.valueFields.add(new ValueField(columnName, function, null));
+            return this;
+        }
+
+        /** 加入值欄位（指定函數 + 自訂顯示名稱） */
+        public Builder value(String columnName, ConsolidateFunction function, String displayLabel) {
+            this.valueFields.add(new ValueField(columnName, function, displayLabel));
             return this;
         }
 

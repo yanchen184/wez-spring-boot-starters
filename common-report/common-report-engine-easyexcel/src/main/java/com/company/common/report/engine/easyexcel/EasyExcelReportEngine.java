@@ -19,6 +19,7 @@ import org.apache.poi.ss.util.CellReference;
 import org.apache.poi.xssf.usermodel.XSSFPivotTable;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.openxmlformats.schemas.spreadsheetml.x2006.main.CTDataFields;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -208,17 +209,36 @@ public class EasyExcelReportEngine implements ReportEngine {
             }
         }
 
-        // 設定值欄位
+        // 設定值欄位 — 直接操作 CTDataFields 避免同欄位多函數時被覆蓋
+        var ctPivotTable = pivotTable.getCTPivotTableDefinition();
+        CTDataFields dataFields = ctPivotTable.getDataFields();
+        if (dataFields == null) {
+            dataFields = ctPivotTable.addNewDataFields();
+        }
+
         for (PivotConfig.ValueField vf : pivot.getValueFields()) {
             int colIdx = findColumnIndex(headerRow, vf.columnName());
-            if (colIdx >= 0) {
-                pivotTable.addColumnLabel(
-                        toPoiFunction(vf.function()),
-                        colIdx,
-                        vf.columnName() + " (" + vf.function().name() + ")"
-                );
+            if (colIdx < 0) {
+                continue;
             }
+            var df = dataFields.addNewDataField();
+            df.setFld(colIdx);
+            df.setName(vf.resolveLabel());
+            df.setSubtotal(toCtFunction(vf.function()));
         }
+        dataFields.setCount(dataFields.getDataFieldList().size());
+    }
+
+    private org.openxmlformats.schemas.spreadsheetml.x2006.main.STDataConsolidateFunction.Enum toCtFunction(
+            PivotConfig.ConsolidateFunction function) {
+        return switch (function) {
+            case SUM -> org.openxmlformats.schemas.spreadsheetml.x2006.main.STDataConsolidateFunction.SUM;
+            case COUNT -> org.openxmlformats.schemas.spreadsheetml.x2006.main.STDataConsolidateFunction.COUNT;
+            case AVERAGE -> org.openxmlformats.schemas.spreadsheetml.x2006.main.STDataConsolidateFunction.AVERAGE;
+            case MAX -> org.openxmlformats.schemas.spreadsheetml.x2006.main.STDataConsolidateFunction.MAX;
+            case MIN -> org.openxmlformats.schemas.spreadsheetml.x2006.main.STDataConsolidateFunction.MIN;
+            case COUNT_NUMS -> org.openxmlformats.schemas.spreadsheetml.x2006.main.STDataConsolidateFunction.COUNT_NUMS;
+        };
     }
 
     private int findColumnIndex(org.apache.poi.ss.usermodel.Row headerRow, String columnName) {
