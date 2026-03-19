@@ -26,8 +26,9 @@ public class ReportService {
     private static final Logger log = LoggerFactory.getLogger(ReportService.class);
 
     private final Map<ReportEngineType, ReportEngine> engineMap;
+    private final ReportThrottleService throttleService;
 
-    public ReportService(List<ReportEngine> engines) {
+    public ReportService(List<ReportEngine> engines, ReportThrottleService throttleService) {
         this.engineMap = engines.stream()
                 .collect(Collectors.toMap(
                         ReportEngine::getType,
@@ -37,6 +38,7 @@ public class ReportService {
                                     "Duplicate ReportEngine registered for type: " + existing.getType());
                         }
                 ));
+        this.throttleService = throttleService;
     }
 
     /**
@@ -50,7 +52,20 @@ public class ReportService {
         log.info("--> report dispatch | engine={}, format={}", context.getEngineType(), context.getOutputFormat());
         validateTemplatePath(context.getTemplatePath());
         ReportEngine engine = resolveEngine(context.getEngineType(), context.getOutputFormat());
-        return engine.generate(context);
+
+        // 限流
+        String reportName = context.getReportName() != null ? context.getReportName() : context.getFileName();
+        boolean throttled = throttleService != null && reportName != null;
+        if (throttled) {
+            throttleService.acquire(reportName);
+        }
+        try {
+            return engine.generate(context);
+        } finally {
+            if (throttled) {
+                throttleService.release(reportName);
+            }
+        }
     }
 
     /**

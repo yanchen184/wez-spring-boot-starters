@@ -6,6 +6,7 @@ import com.company.common.report.repository.ReportLogRepository;
 import com.company.common.report.service.ReportAsyncService;
 import com.company.common.report.service.ReportLogService;
 import com.company.common.report.service.ReportService;
+import com.company.common.report.service.ReportThrottleService;
 import com.company.common.report.spi.ReportEngine;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -15,6 +16,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.data.redis.core.RedisTemplate;
 
 import java.util.List;
 
@@ -34,8 +36,19 @@ public class ReportAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public ReportService reportService(List<ReportEngine> engines) {
-        return new ReportService(engines);
+    @ConditionalOnProperty(prefix = "common.report.throttle", name = "enabled", matchIfMissing = true)
+    public ReportThrottleService reportThrottleService(RedisTemplate<String, Object> redisTemplate,
+                                                       ReportProperties properties) {
+        ReportProperties.Throttle t = properties.getThrottle();
+        return new ReportThrottleService(redisTemplate, t.isEnabled(), t.isGlobalEnabled(),
+                t.getGlobalMaxConcurrent(), t.getDefaultMaxConcurrent(), t.getLimits());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ReportService reportService(List<ReportEngine> engines,
+                                       @Autowired(required = false) ReportThrottleService throttleService) {
+        return new ReportService(engines, throttleService);
     }
 
     @Bean

@@ -26,6 +26,9 @@ public class ReportContext {
     /** 輸出檔名 */
     private String fileName;
 
+    /** 報表名稱（限流用，若未設定則以 fileName 作為 fallback） */
+    private String reportName;
+
     /** 額外參數 */
     private Map<String, Object> parameters = new HashMap<>();
 
@@ -71,6 +74,14 @@ public class ReportContext {
 
     public void setFileName(String fileName) {
         this.fileName = fileName;
+    }
+
+    public String getReportName() {
+        return reportName;
+    }
+
+    public void setReportName(String reportName) {
+        this.reportName = reportName;
     }
 
     public Map<String, Object> getParameters() {
@@ -122,6 +133,7 @@ public class ReportContext {
         private ReportEngineType engineType;
         private OutputFormat outputFormat;
         private String fileName;
+        private String reportName;
         private Map<String, Object> parameters = new HashMap<>();
         private List<?> data;
         private List<SheetData> sheets = new ArrayList<>();
@@ -132,6 +144,7 @@ public class ReportContext {
         public Builder engineType(ReportEngineType engineType) { this.engineType = engineType; return this; }
         public Builder outputFormat(OutputFormat outputFormat) { this.outputFormat = outputFormat; return this; }
         public Builder fileName(String fileName) { this.fileName = fileName; return this; }
+        public Builder reportName(String reportName) { this.reportName = reportName; return this; }
         public Builder parameters(Map<String, Object> parameters) {
             this.parameters = parameters != null ? new HashMap<>(parameters) : new HashMap<>();
             return this;
@@ -223,6 +236,7 @@ public class ReportContext {
             ctx.setEngineType(engineType);
             ctx.setOutputFormat(outputFormat);
             ctx.setFileName(fileName);
+            ctx.setReportName(reportName);
             ctx.setParameters(parameters);
             ctx.setData(data);
             ctx.setSheets(sheets);

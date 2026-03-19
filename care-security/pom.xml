@@ -24,6 +24,7 @@
 
     <modules>
         <module>common-security-core</module>
+        <module>common-security-cert-core</module>
         <module>common-security-auth-ldap</module>
         <module>common-security-auth-moica</module>
         <module>common-security-auth-otp</module>
@@ -38,6 +39,11 @@
             <dependency>
                 <groupId>com.company.common</groupId>
                 <artifactId>common-security-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.company.common</groupId>
+                <artifactId>common-security-cert-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

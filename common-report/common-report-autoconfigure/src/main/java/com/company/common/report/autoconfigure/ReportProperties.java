@@ -55,6 +55,12 @@ public class ReportProperties {
         this.cleanup = cleanup;
     }
 
+    /** 限流設定 */
+    private Throttle throttle = new Throttle();
+
+    public Throttle getThrottle() { return throttle; }
+    public void setThrottle(Throttle throttle) { this.throttle = throttle; }
+
     /**
      * 儲存方式設定
      */
@@ -162,6 +168,69 @@ public class ReportProperties {
 
         public void setRetentionDays(int retentionDays) {
             this.retentionDays = retentionDays;
+        }
+    }
+
+    /**
+     * 報表產製限流設定（Redis 分散式限流）
+     */
+    public static class Throttle {
+
+        /** 是否啟用限流 */
+        private boolean enabled = true;
+
+        /** 全域限流開關（預設關） */
+        private boolean globalEnabled = false;
+
+        /** 全域（跨機器）同時產製上限（globalEnabled=true 才生效） */
+        @Min(1)
+        private int globalMaxConcurrent = 10;
+
+        /** 每種報表預設同時產製上限 */
+        @Min(1)
+        private int defaultMaxConcurrent = 10;
+
+        /** 個別報表客製化上限（key = reportName） */
+        private java.util.Map<String, Integer> limits = new java.util.HashMap<>();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public boolean isGlobalEnabled() {
+            return globalEnabled;
+        }
+
+        public void setGlobalEnabled(boolean globalEnabled) {
+            this.globalEnabled = globalEnabled;
+        }
+
+        public int getGlobalMaxConcurrent() {
+            return globalMaxConcurrent;
+        }
+
+        public void setGlobalMaxConcurrent(int globalMaxConcurrent) {
+            this.globalMaxConcurrent = globalMaxConcurrent;
+        }
+
+        public int getDefaultMaxConcurrent() {
+            return defaultMaxConcurrent;
+        }
+
+        public void setDefaultMaxConcurrent(int defaultMaxConcurrent) {
+            this.defaultMaxConcurrent = defaultMaxConcurrent;
+        }
+
+        public java.util.Map<String, Integer> getLimits() {
+            return limits;
+        }
+
+        public void setLimits(java.util.Map<String, Integer> limits) {
+            this.limits = limits;
         }
     }
 }

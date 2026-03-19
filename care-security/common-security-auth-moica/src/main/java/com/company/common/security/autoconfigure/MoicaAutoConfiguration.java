@@ -1,5 +1,8 @@
 package com.company.common.security.autoconfigure;
 
+import com.company.common.security.cert.CertFactory;
+import com.company.common.security.cert.CertProvider;
+import com.company.common.security.cert.provider.MoicaCertProvider;
 import com.company.common.security.controller.CitizenCertController;
 import com.company.common.security.service.CitizenCertUserSyncService;
 import com.company.common.security.service.LoginTokenService;
@@ -17,6 +20,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.data.redis.core.RedisTemplate;
+
+import java.util.List;
 
 /**
  * Auto-configuration for MOICA citizen digital certificate (自然人憑證) authentication.
@@ -71,6 +76,18 @@ public class MoicaAutoConfiguration {
         return new CitizenCertUserSyncService(saUserRepository, roleRepository,
                 saUserOrgRoleRepository, organizeRepository,
                 properties.getCitizenCert().getDefaultRoles());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public MoicaCertProvider moicaCertProvider() {
+        return new MoicaCertProvider();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public CertFactory certFactory(List<CertProvider> providers) {
+        return new CertFactory(providers);
     }
 
     @Bean
