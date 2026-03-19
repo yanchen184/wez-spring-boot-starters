@@ -1,0 +1,18 @@
+name: Notify Portal
+
+on:
+  push:
+    paths:
+      - '**README.md'
+      - '**/README.md'
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger starter-portal sync
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.PORTAL_SYNC_TOKEN }}
+          repository: yanchen184/starter-portal
+          event-type: docs-updated
