@@ -38,6 +38,9 @@ public class ReportContext {
     /** 圖片來源（xDocReport 用） */
     private Map<String, ImageSource> images = new LinkedHashMap<>();
 
+    /** 樞紐分析表設定（EasyExcel 用） */
+    private List<PivotConfig> pivots = new ArrayList<>();
+
     public String getTemplatePath() {
         return templatePath;
     }
@@ -102,6 +105,14 @@ public class ReportContext {
         this.images = images;
     }
 
+    public List<PivotConfig> getPivots() {
+        return pivots;
+    }
+
+    public void setPivots(List<PivotConfig> pivots) {
+        this.pivots = pivots;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -115,6 +126,7 @@ public class ReportContext {
         private List<?> data;
         private List<SheetData> sheets = new ArrayList<>();
         private Map<String, ImageSource> images = new LinkedHashMap<>();
+        private List<PivotConfig> pivots = new ArrayList<>();
 
         public Builder templatePath(String templatePath) { this.templatePath = templatePath; return this; }
         public Builder engineType(ReportEngineType engineType) { this.engineType = engineType; return this; }
@@ -191,6 +203,20 @@ public class ReportContext {
             return this;
         }
 
+        // ===== 樞紐分析表 =====
+
+        /** 加入樞紐分析表 */
+        public Builder pivot(PivotConfig pivotConfig) {
+            this.pivots.add(pivotConfig);
+            return this;
+        }
+
+        /** 設定所有樞紐分析表 */
+        public Builder pivots(List<PivotConfig> pivots) {
+            this.pivots = pivots != null ? new ArrayList<>(pivots) : new ArrayList<>();
+            return this;
+        }
+
         public ReportContext build() {
             ReportContext ctx = new ReportContext();
             ctx.setTemplatePath(templatePath);
@@ -201,6 +227,7 @@ public class ReportContext {
             ctx.setData(data);
             ctx.setSheets(sheets);
             ctx.setImages(images);
+            ctx.setPivots(pivots);
             return ctx;
         }
     }
