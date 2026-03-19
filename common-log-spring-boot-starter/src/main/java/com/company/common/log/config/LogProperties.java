@@ -79,7 +79,8 @@ public class LogProperties {
             "/actuator/**",
             "/health",
             "/metrics",
-            "/favicon.ico"
+            "/favicon.ico",
+            "/ws/**"
     );
 
     // Getters and Setters

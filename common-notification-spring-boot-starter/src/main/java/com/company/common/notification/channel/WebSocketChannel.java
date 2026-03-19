@@ -40,7 +40,8 @@ public class WebSocketChannel implements NotificationChannel {
                         ? notification.getCreatedDate().toString() : ""
         );
 
+        log.info("WebSocket 推送: userId={}, destination={}, subject={}", userId, destination, notification.getSubject());
         messagingTemplate.convertAndSendToUser(userId, destination, payload);
-        log.debug("WebSocket notification sent to user {}: {}", userId, notification.getSubject());
+        log.info("WebSocket 推送完成: userId={}", userId);
     }
 }

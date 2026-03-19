@@ -103,7 +103,6 @@ public class ApiLogFilter extends OncePerRequestFilter {
         long startTime = System.currentTimeMillis();
         String httpMethod = request.getMethod();
         String uri = request.getRequestURI();
-        String user = getUsername(request);
 
         // 包裝 request 以便重複讀取 body（Spring 7.x 要求指定 contentCacheLimit）
         ContentCachingRequestWrapper wrappedRequest =
@@ -117,15 +116,16 @@ public class ApiLogFilter extends OncePerRequestFilter {
                         ? (ContentCachingResponseWrapper) response
                         : new ContentCachingResponseWrapper(response);
 
-        // --> 請求 log（在 doFilter 之前印，確保時序正確）
-        // 此時尚無 @Loggable 資訊，先用預設行為印出基本請求 log
-        // GET/DELETE 可以印 query params，POST/PUT body 要等 doFilter 後才讀得到
-        log.info("--> {} {} user={}", httpMethod, uri, user);
-
         try {
-            // 執行 filter chain（包含 Interceptor + Controller）
+            // 執行 filter chain（包含 Security JWT Filter + Interceptor + Controller）
             filterChain.doFilter(wrappedRequest, wrappedResponse);
         } finally {
+            // doFilter 後取 user，Security filter 已解析 JWT
+            String user = getUsername(wrappedRequest);
+
+            // --> 請求 log
+            log.info("--> {} {} user={}", httpMethod, uri, user);
+
             // Interceptor 已在 preHandle 設定好 attributes
             boolean handlerResolved = Boolean.TRUE.equals(
                     wrappedRequest.getAttribute(ApiLogInterceptor.ATTR_HANDLER_RESOLVED));
