@@ -74,7 +74,14 @@ import java.util.function.Supplier;
 @AutoConfiguration
 @ConditionalOnProperty(prefix = "care.security", name = "enabled", havingValue = "true", matchIfMissing = true)
 @EnableConfigurationProperties(CareSecurityProperties.class)
-@ComponentScan(basePackages = {"com.company.common.security.controller", "com.company.common.security.exception"})
+@ComponentScan(
+        basePackages = {"com.company.common.security.controller", "com.company.common.security.exception"},
+        excludeFilters = @ComponentScan.Filter(
+                type = org.springframework.context.annotation.FilterType.REGEX,
+                pattern = "com\\.company\\.common\\.security\\.controller\\."
+                        + "(CaptchaController|CitizenCertController|LdapController|OtpController)"
+        )
+)
 @EntityScan(basePackages = "com.company.common.security.entity")
 @EnableJpaRepositories(basePackages = "com.company.common.security.repository")
 public class CareSecurityAutoConfiguration {
