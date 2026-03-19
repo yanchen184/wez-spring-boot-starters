@@ -422,6 +422,68 @@ mvn versions:set -DnewVersion=1.1.0
 mvn versions:commit
 ```
 
+### 正式發佈流程
+
+#### 1. 決定版號
+
+| 改動類型 | 版號變更 | 範例 |
+|----------|---------|------|
+| Bug 修復、預設值調整 | patch | `1.0.0` → `1.0.1` |
+| 新增功能（向下相容） | minor | `1.0.0` → `1.1.0` |
+| 破壞性變更（API 改動） | major | `1.0.0` → `2.0.0` |
+
+#### 2. 升版 + 建置 + 發佈
+
+```bash
+# 升版
+mvn versions:set -DnewVersion=1.0.1
+mvn versions:commit
+
+# 建置 + 測試 + 靜態分析
+mvn clean install
+
+# 發佈到內部 Nexus（如有）
+mvn deploy -DskipTests
+
+# 提交 + 打 tag
+git add -A
+git commit -m "release: v1.0.1"
+git tag v1.0.1
+git push origin main --tags
+```
+
+#### 3. 消費端升級
+
+消費端只需改 BOM 版號，所有 starter 版本統一跟著走：
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>com.company.common</groupId>
+            <artifactId>company-common-starters</artifactId>
+            <version>1.0.1</version>  <!-- ← 改這一行 -->
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+然後重新 build：
+
+```bash
+mvn clean compile
+```
+
+不需要改個別 starter 的 version，BOM 統一管理。
+
+#### 4. 版本紀錄
+
+| 版本 | 日期 | 變更摘要 |
+|------|------|---------|
+| 1.0.0 | 2026-03-18 | 初始版本：log、response、jpa、security、attachment、report、notification、signature |
+
 ---
 
 ## 設計原則
