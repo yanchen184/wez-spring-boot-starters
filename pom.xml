@@ -25,6 +25,8 @@
         <module>care-security</module>
         <!-- 報表模組 -->
         <module>common-report</module>
+        <!-- 通知模組 -->
+        <module>common-notification-spring-boot-starter</module>
     </modules>
 
     <properties>
