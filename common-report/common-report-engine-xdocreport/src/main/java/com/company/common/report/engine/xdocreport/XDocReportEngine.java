@@ -19,6 +19,13 @@ import fr.opensagres.xdocreport.template.formatter.FieldsMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.poi.util.Units;
+import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
+
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -87,8 +94,9 @@ public class XDocReportEngine implements ReportEngine {
                 context.getParameters().forEach(velocityContext::put);
             }
 
-            // 4. 如果有 data list，放入 context
+            // 4. 如果有 data list，轉換 ImageSource 並放入 context
             if (context.getData() != null && !context.getData().isEmpty()) {
+                convertImageSourceInData(context.getData());
                 velocityContext.put("items", context.getData());
             }
 
@@ -107,6 +115,18 @@ public class XDocReportEngine implements ReportEngine {
             throw new IllegalStateException("Failed to generate xDocReport", e);
         }
 
+        // 7. 後處理：用 POI 插入頂層圖片（如 logo）
+        if (context.getImages() != null && !context.getImages().isEmpty()
+                && context.getOutputFormat() == OutputFormat.DOCX) {
+            byte[] withImages = insertImagesWithPoi(out.toByteArray(), context.getImages());
+            out.reset();
+            try {
+                out.write(withImages);
+            } catch (IOException e) {
+                throw new IllegalStateException("Failed to write image result", e);
+            }
+        }
+
         validateFileSize(out);
 
         String fileName = resolveFileName(context);
@@ -115,6 +135,44 @@ public class XDocReportEngine implements ReportEngine {
         log.info("<-- xDocReport generate | fileName={}, size={} bytes",
                 fileName, out.size());
         return new ReportResult(out.toByteArray(), contentType, fileName);
+    }
+
+    /**
+     * 用 POI 後處理：找到「圖片書籤」段落，插入真實圖片取代純文字。
+     *
+     * <p>xDocReport 的 addFieldAsImage 對 POI 程式化產生的範本不可靠，
+     * 所以改用後處理方式：xDocReport 先做 Velocity 替換，
+     * 再用 POI 打開結果 docx，找到空段落（原 $logo 位置已被清空），插入圖片。
+     */
+    private byte[] insertImagesWithPoi(byte[] docxBytes, Map<String, ImageSource> images) {
+        try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(docxBytes))) {
+            for (Map.Entry<String, ImageSource> entry : images.entrySet()) {
+                ImageSource src = entry.getValue();
+                byte[] imgBytes = src.resolveContent();
+                int width = src.getWidth() != null ? src.getWidth() : 200;
+                int height = src.getHeight() != null ? src.getHeight() : 50;
+
+                // 找第一個空段落（xDocReport 替換 $logo 後變成空的），插入圖片
+                for (XWPFParagraph para : doc.getParagraphs()) {
+                    if (para.getText().isBlank() && para.getRuns().isEmpty()) {
+                        para.setAlignment(ParagraphAlignment.CENTER);
+                        XWPFRun run = para.createRun();
+                        run.addPicture(new ByteArrayInputStream(imgBytes),
+                                XWPFDocument.PICTURE_TYPE_PNG,
+                                entry.getKey() + ".png",
+                                Units.toEMU(width), Units.toEMU(height));
+                        break;
+                    }
+                }
+            }
+
+            ByteArrayOutputStream result = new ByteArrayOutputStream();
+            doc.write(result);
+            return result.toByteArray();
+        } catch (Exception e) {
+            log.warn("Failed to insert images via POI, returning original docx", e);
+            return docxBytes;
+        }
     }
 
     @Override
@@ -180,7 +238,8 @@ public class XDocReportEngine implements ReportEngine {
     }
 
     /**
-     * 註冊 list 資料欄位到 FieldsMetadata，讓表格行自動重複
+     * 註冊 list 資料欄位到 FieldsMetadata，讓表格行自動重複。
+     * 如果欄位值是 ImageSource，同時註冊為 image。
      */
     @SuppressWarnings("unchecked")
     private void registerListMetadata(IXDocReport report, List<?> data) throws XDocReportException {
@@ -190,14 +249,47 @@ public class XDocReportEngine implements ReportEngine {
         FieldsMetadata metadata = getOrCreateMetadata(report);
         Object first = data.getFirst();
         if (first instanceof Map) {
-            // Map 模式：從 key 推導欄位名
             Map<String, Object> map = (Map<String, Object>) first;
-            for (String key : map.keySet()) {
-                metadata.addFieldAsList("items." + key);
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                String fieldName = "items." + entry.getKey();
+                if (entry.getValue() instanceof ImageSource) {
+                    // 圖片欄位：同時註冊為 list + image
+                    metadata.addFieldAsImage(fieldName, fieldName);
+                } else {
+                    metadata.addFieldAsList(fieldName);
+                }
             }
         } else {
-            // POJO 模式
             metadata.load("items", first.getClass(), true);
+        }
+    }
+
+    /**
+     * 將 data list 裡的 ImageSource 值轉成 IImageProvider，
+     * 讓 xDocReport 能正確處理欄位圖片。
+     */
+    @SuppressWarnings("unchecked")
+    private void convertImageSourceInData(List<?> data) {
+        if (data == null || data.isEmpty()) {
+            return;
+        }
+        for (Object item : data) {
+            if (item instanceof Map) {
+                Map<String, Object> map = (Map<String, Object>) item;
+                for (Map.Entry<String, Object> entry : map.entrySet()) {
+                    if (entry.getValue() instanceof ImageSource imgSrc) {
+                        byte[] bytes = imgSrc.resolveContent();
+                        IImageProvider provider = new ByteArrayImageProvider(bytes);
+                        if (imgSrc.getWidth() != null) {
+                            provider.setWidth(imgSrc.getWidth().floatValue());
+                        }
+                        if (imgSrc.getHeight() != null) {
+                            provider.setHeight(imgSrc.getHeight().floatValue());
+                        }
+                        entry.setValue(provider);
+                    }
+                }
+            }
         }
     }
 

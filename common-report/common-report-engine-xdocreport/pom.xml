@@ -37,6 +37,12 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- POI (for image post-processing) -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+        </dependency>
+
         <!-- AutoConfiguration support -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
