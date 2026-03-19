@@ -22,6 +22,8 @@ import net.sf.jasperreports.poi.export.JRXlsExporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import net.sf.jasperreports.engine.DefaultJasperReportsContext;
+
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -50,6 +52,12 @@ public class JasperReportEngine implements ReportEngine {
     private static final Set<OutputFormat> SUPPORTED_FORMATS = Set.of(
             OutputFormat.PDF, OutputFormat.XLSX
     );
+
+    public JasperReportEngine() {
+        // 關閉字體嚴格檢查，讓 JR 自動 fallback 到系統可用字體
+        DefaultJasperReportsContext.getInstance()
+                .setProperty("net.sf.jasperreports.awt.ignore.missing.font", "true");
+    }
 
     @Override
     public ReportEngineType getType() {
