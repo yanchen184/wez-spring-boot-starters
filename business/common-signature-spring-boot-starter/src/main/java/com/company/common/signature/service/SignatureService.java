@@ -16,61 +16,46 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * 電子簽名核心服務。
- *
- * <p>負責簽名資料的 CRUD，同時管理簽名截圖附件。
- * 簽名截圖以 {@code SIGNATURE} 作為附件的 ownerType。</p>
- */
 @Slf4j
 @RequiredArgsConstructor
 public class SignatureService {
 
-    /** 附件 ownerType 前綴，與業務 ownerType 組合成唯一標識。 */
     private static final String ATTACHMENT_OWNER_PREFIX = "SIGN_";
 
     private final SignatureDiagramRepository repository;
     private final AttachmentService attachmentService;
 
     /**
-     * 儲存簽名（新增或更新）。
-     *
-     * <p>流程：
-     * <ol>
-     *   <li>依 ownerType + ownerId 查詢是否已有簽名，沒有就新建</li>
-     *   <li>更新 Canvas JSON</li>
-     *   <li>如果有圖片，先軟刪除舊附件，再上傳新附件</li>
-     * </ol>
-     *
-     * @param request 簽名資料（ownerType, ownerId, json）
-     * @param image   Canvas 截圖 PNG（可為 null）
-     * @return 簽名回應
+     * 儲存簽名。
+     * 如果已有簽名，舊的整筆軟刪除（content + 附件都保留），新建一筆。
      */
     @Transactional
     public SignatureResponse save(SignatureSaveRequest request, MultipartFile image) throws IOException {
-        SignatureDiagram diagram = repository
-                .findByOwnerTypeAndOwnerId(request.ownerType(), request.ownerId())
-                .orElseGet(() -> {
-                    SignatureDiagram sd = new SignatureDiagram();
-                    sd.setOwnerType(request.ownerType());
-                    sd.setOwnerId(request.ownerId());
-                    return sd;
+        // 軟刪除舊簽名（整筆保留，標記 deleted=true）
+        repository.findActiveByOwner(request.ownerType(), request.ownerId())
+                .ifPresent(old -> {
+                    // 舊附件也軟刪除
+                    if (old.getAttachmentId() != null) {
+                        try {
+                            attachmentService.softDelete(old.getAttachmentId());
+                        } catch (Exception e) {
+                            log.warn("軟刪除舊簽名附件失敗: attachmentId={}", old.getAttachmentId(), e);
+                        }
+                    }
+                    old.delete();
+                    repository.save(old);
+                    log.info("舊簽名已軟刪除: id={}, ownerType={}, ownerId={}",
+                            old.getId(), old.getOwnerType(), old.getOwnerId());
                 });
 
+        // 新建一筆
+        SignatureDiagram diagram = new SignatureDiagram();
+        diagram.setOwnerType(request.ownerType());
+        diagram.setOwnerId(request.ownerId());
         diagram.setContent(request.json());
 
-        // 處理簽名截圖附件
+        // 上傳新附件
         if (image != null && !image.isEmpty()) {
-            // 軟刪除舊附件
-            if (diagram.getAttachmentId() != null) {
-                try {
-                    attachmentService.softDelete(diagram.getAttachmentId());
-                } catch (Exception e) {
-                    log.warn("刪除舊簽名附件失敗: attachmentId={}", diagram.getAttachmentId(), e);
-                }
-            }
-
-            // 上傳新附件
             String attachOwnerType = ATTACHMENT_OWNER_PREFIX + request.ownerType();
             AttachmentUploadRequest uploadRequest = new AttachmentUploadRequest(
                     attachOwnerType,
@@ -92,50 +77,33 @@ public class SignatureService {
         return toResponse(diagram);
     }
 
-    /**
-     * 查詢簽名。
-     *
-     * @param ownerType 業務表名
-     * @param ownerId   業務資料 ID
-     * @return 簽名回應，若不存在回傳 null
-     */
     @Transactional(readOnly = true)
     public SignatureResponse findByOwner(String ownerType, Long ownerId) {
-        return repository.findByOwnerTypeAndOwnerId(ownerType, ownerId)
+        return repository.findActiveByOwner(ownerType, ownerId)
                 .map(this::toResponse)
                 .orElse(null);
     }
 
     /**
-     * 刪除簽名（連同附件一起軟刪除）。
-     *
-     * @param ownerType 業務表名
-     * @param ownerId   業務資料 ID
+     * 刪除簽名（簽名 + 附件都軟刪除，資料保留可追溯）。
      */
     @Transactional
     public void delete(String ownerType, Long ownerId) {
-        repository.findByOwnerTypeAndOwnerId(ownerType, ownerId)
+        repository.findActiveByOwner(ownerType, ownerId)
                 .ifPresent(diagram -> {
-                    // 軟刪除附件
                     if (diagram.getAttachmentId() != null) {
                         try {
                             attachmentService.softDelete(diagram.getAttachmentId());
                         } catch (Exception e) {
-                            log.warn("刪除簽名附件失敗: attachmentId={}", diagram.getAttachmentId(), e);
+                            log.warn("軟刪除簽名附件失敗: attachmentId={}", diagram.getAttachmentId(), e);
                         }
                     }
-                    repository.delete(diagram);
-                    log.info("簽名已刪除: ownerType={}, ownerId={}", ownerType, ownerId);
+                    diagram.delete();
+                    repository.save(diagram);
+                    log.info("簽名已軟刪除: ownerType={}, ownerId={}", ownerType, ownerId);
                 });
     }
 
-    /**
-     * 查詢某業務類型下所有簽名的附件列表。
-     *
-     * @param ownerType 業務表名
-     * @param ownerId   業務資料 ID
-     * @return 附件列表
-     */
     @Transactional(readOnly = true)
     public List<AttachmentUploadResponse> getAttachments(String ownerType, Long ownerId) {
         String attachOwnerType = ATTACHMENT_OWNER_PREFIX + ownerType;
