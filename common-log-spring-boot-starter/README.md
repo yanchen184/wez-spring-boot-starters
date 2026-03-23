@@ -4,6 +4,20 @@
 
 ---
 
+## 目錄
+
+- [加入後你的專案自動獲得](#加入後你的專案自動獲得)
+- [快速開始](#快速開始)
+- [功能總覽](#功能總覽)
+- [核心 API](#核心-api)
+- [配置](#配置)
+- [設計決策](#設計決策)
+- [依賴關係](#依賴關係)
+- [專案結構與技術規格](#專案結構與技術規格)
+- [版本](#版本)
+
+---
+
 ## 加入後你的專案自動獲得
 
 | 功能 | 加入前 | 加入後 |
@@ -33,6 +47,24 @@
 
 ---
 
+## 快速開始
+
+### 1. 引入依賴
+
+```xml
+<dependency>
+    <groupId>com.company.common</groupId>
+    <artifactId>common-log-spring-boot-starter</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+### 2. 完成
+
+不需要任何配置，所有 `@RestController` 自動記錄日誌。
+
+---
+
 ## 功能總覽
 
 - **API 自動日誌** — 所有 `@RestController` 自動記錄請求/回應/耗時
@@ -45,39 +77,137 @@
 
 ---
 
-## 日誌格式
+## 核心 API
+
+### 日誌格式
 
 ```
 HH:mm:ss.SSS LEVEL [traceId,spanId] logger : 訊息
 ```
 
-### Request（-->）
+#### Request（-->）
 ```
 11:30:15.123 INFO  [d12e3e1f,08f395d1] ApiLogAspect : --> POST /api/auth/login body={username:admin, password:***} user=anonymous
 11:30:15.456 INFO  [a1b2c3d4,e5f6a7b8] ApiLogAspect : --> GET /api/users user=admin
 ```
 
-### Response（<--）
+#### Response（<--）
 ```
 11:30:15.789 INFO  [d12e3e1f,08f395d1] ApiLogAspect : <-- 200 POST /api/auth/login 274ms
 11:30:20.456 WARN  [a1b2c3d4,e5f6a7b8] ApiLogAspect : <-- 200 GET /api/reports/export 5003ms [SLOW]
 ```
 
-### Response with Body（<-- body=）
+#### Response with Body（<-- body=）
+
 開啟 `logResponseBody` 後，回應日誌會附帶遮罩後的 body：
 ```
 11:30:15.789 INFO  [d12e3e1f,08f395d1] ApiLogAspect : <-- 200 POST /api/auth/login 274ms body={token:***, userId:1, username:admin}
 11:30:20.456 WARN  [a1b2c3d4,e5f6a7b8] ApiLogAspect : <-- 200 GET /api/reports/export 5003ms [SLOW] body={total:1000, data:[...]}
 ```
 
-### Error（<-- 500）
+#### Error（<-- 500）
 ```
 11:30:15.999 ERROR [c7c0cdda,e36329fa] ApiLogAspect : <-- 500 GET /api/log-demo/error 3ms error="NullPointerException: Cannot invoke..." (LogDemoController.java:57)
 ```
 
+### @Loggable 註解
+
+```java
+// 自訂遮罩欄位
+@Loggable(maskFields = {"password", "token", "idNumber"})
+
+// 自訂慢 API 閾值（此 API 5 秒才算慢）
+@Loggable(slowThresholdMs = 5000)
+
+// 不印 request body
+@Loggable(logRequest = false)
+
+// 只印耗時
+@Loggable(logRequest = false, logResponse = false, logDuration = true)
+
+// 印出回應 Body（遮罩敏感欄位）
+@Loggable(logResponseBody = true)
+
+// 印出回應 Body + 自訂遮罩欄位
+@Loggable(logResponseBody = true, maskFields = {"password", "token", "idNumber"})
+```
+
+### Micrometer Tracing
+
+使用 Spring 官方的 Micrometer Tracing（取代已廢棄的 Spring Cloud Sleuth）。
+
+| 功能 | 說明 |
+|------|------|
+| traceId/spanId 產生 | Micrometer + OpenTelemetry 自動產生 |
+| MDC 自動注入 | logback pattern 用 `%X{traceId}` 輸出 |
+| 跨服務傳播 | RestTemplate/WebClient 自動帶 `traceparent` header |
+| W3C Trace Context | 標準協定，跨語言相容 |
+
+透過 `ObjectProvider<Tracer>` 注入，無 Tracer 環境也能正常運作。
+
+#### 跨系統 traceId 傳播
+
+Spring Boot 呼叫其他服務時，Micrometer 自動在 header 帶上：
+
+```
+traceparent: 00-{traceId}-{spanId}-{flags}
+```
+
+對方系統取得 traceId：
+
+```java
+// 解析 traceparent header
+String traceparent = request.getHeader("traceparent");
+String traceId = traceparent.split("-")[1];
+MDC.put("traceId", traceId);
+```
+
+### 兩個 Pointcut 的分工
+
+```java
+// 1. 沒有 @Loggable 的 RestController 方法 → 用預設值
+@Around("@within(RestController) && !@annotation(Loggable)")
+
+// 2. 有 @Loggable 的方法 → 用註解上的自訂值
+@Around("@annotation(loggable)")
+```
+
+### 敏感遮罩原理
+
+```
+任意物件 → Jackson convertValue → Map<String, Object> → 遍歷 key 遮罩 → 簡潔格式輸出
+```
+
+支援 Map、POJO、List，不需要知道具體型別。
+
 ---
 
-## 格式設計決策
+## 配置
+
+### application.yml
+
+```yaml
+common:
+  log:
+    enabled: true                # 是否啟用（預設 true）
+    slow-threshold-ms: 3000      # 慢 API 閾值，超過則 WARN（預設 3000ms）
+    mask-fields:                 # 需要遮罩的欄位（預設 password, token, creditCard）
+      - password
+      - token
+      - creditCard
+    log-response-body: false     # 是否印出回應 Body（預設 false）
+    max-response-length: 1000    # 回應 Body 最大記錄長度（預設 1000）
+    exclude-patterns:            # 排除的 URL，不記錄 log（預設如下）
+      - /actuator/**
+      - /health
+      - /favicon.ico
+```
+
+> Log Pattern（含 traceId/spanId）由 starter 自動設定，無需手動配置。如需覆蓋，自行設定 `logging.pattern.console` 即可。
+
+---
+
+## 設計決策
 
 ### 要什麼
 
@@ -113,104 +243,23 @@ HH:mm:ss.SSS LEVEL [traceId,spanId] logger : 訊息
 
 ---
 
-## 快速開始
+## 依賴關係
 
-### 1. 引入依賴
-
-```xml
-<dependency>
-    <groupId>com.company.common</groupId>
-    <artifactId>common-log-spring-boot-starter</artifactId>
-    <version>1.0.0</version>
-</dependency>
 ```
-
-### 2. 完成
-
-不需要任何配置，所有 `@RestController` 自動記錄日誌。
-
----
-
-## 配置
-
-### application.yml
-
-```yaml
-common:
-  log:
-    enabled: true                # 是否啟用（預設 true）
-    slow-threshold-ms: 3000      # 慢 API 閾值，超過則 WARN（預設 3000ms）
-    mask-fields:                 # 需要遮罩的欄位
-      - password
-      - token
-      - creditCard
-    log-response-body: false     # 是否印出回應 Body（預設 false）
-    max-response-length: 1000   # 回應 Body 最大記錄長度（預設 1000）
-    exclude-patterns:            # 排除的 URL（不記錄 log）
-      - /actuator/**
-      - /health
-      - /favicon.ico
-```
-
-> Log Pattern（含 traceId/spanId）由 starter 自動設定，無需手動配置。如需覆蓋，自行設定 `logging.pattern.console` 即可。
-
-### @Loggable 註解
-
-```java
-// 自訂遮罩欄位
-@Loggable(maskFields = {"password", "token", "idNumber"})
-
-// 自訂慢 API 閾值（此 API 5 秒才算慢）
-@Loggable(slowThresholdMs = 5000)
-
-// 不印 request body
-@Loggable(logRequest = false)
-
-// 只印耗時
-@Loggable(logRequest = false, logResponse = false, logDuration = true)
-
-// 印出回應 Body（遮罩敏感欄位）
-@Loggable(logResponseBody = true)
-
-// 印出回應 Body + 自訂遮罩欄位
-@Loggable(logResponseBody = true, maskFields = {"password", "token", "idNumber"})
+common-log-spring-boot-starter
+├── spring-boot-starter (provided)
+├── spring-boot-starter-web (provided)
+├── spring-boot-starter-aop (provided)
+├── micrometer-tracing-bridge-otel (optional)
+├── opentelemetry-exporter-zipkin (optional)
+└── jackson-databind (provided)
 ```
 
 ---
 
-## Micrometer Tracing
+## 專案結構與技術規格
 
-使用 Spring 官方的 Micrometer Tracing（取代已廢棄的 Spring Cloud Sleuth）。
-
-| 功能 | 說明 |
-|------|------|
-| traceId/spanId 產生 | Micrometer + OpenTelemetry 自動產生 |
-| MDC 自動注入 | logback pattern 用 `%X{traceId}` 輸出 |
-| 跨服務傳播 | RestTemplate/WebClient 自動帶 `traceparent` header |
-| W3C Trace Context | 標準協定，跨語言相容 |
-
-透過 `ObjectProvider<Tracer>` 注入，無 Tracer 環境也能正常運作。
-
-### 跨系統 traceId 傳播
-
-Spring Boot 呼叫其他服務時，Micrometer 自動在 header 帶上：
-
-```
-traceparent: 00-{traceId}-{spanId}-{flags}
-```
-
-對方系統取得 traceId：
-
-```java
-// 解析 traceparent header
-String traceparent = request.getHeader("traceparent");
-String traceId = traceparent.split("-")[1];
-MDC.put("traceId", traceId);
-```
-
----
-
-## 專案結構
+### 目錄樹
 
 ```
 common-log-spring-boot-starter/
@@ -233,29 +282,29 @@ common-log-spring-boot-starter/
 └── pom.xml
 ```
 
----
+### 技術規格
 
-## 核心技術
+| 項目 | 值 |
+|------|-----|
+| Java | 21 |
+| Spring Boot | 4.0.3 |
+| 自動配置 | `AutoConfiguration.imports` + `spring.factories`（EPP） |
+| Tracing | Micrometer Tracing + OpenTelemetry Bridge |
+| AOP | `@Around` Pointcut（RestController + @Loggable） |
+| Log Pattern | `EnvironmentPostProcessor`（logging 初始化前設定） |
+| 遮罩 | Jackson `convertValue` → Map 遍歷 |
 
-### 為什麼用 AOP 而不是 Filter / Interceptor？
+### 核心技術說明
+
+#### 為什麼用 AOP 而不是 Filter / Interceptor？
 
 | 方案 | 能拿到 `@RequestBody`？ | 能拿到 `@Loggable` 註解？ | 能拿到回傳值？ |
 |------|------------------------|--------------------------|--------------|
-| Servlet Filter | ❌ 需要包裝 InputStream | ❌ 不知道目標方法 | ❌ |
-| HandlerInterceptor | ❌ 只有 HttpServletRequest | ❌ 要自己反射找 | ⚠️ 只有 ModelAndView |
-| **AOP @Around** ✅ | ✅ 直接從方法參數取 | ✅ `@annotation(loggable)` | ✅ `joinPoint.proceed()` 回傳值 |
+| Servlet Filter | 需要包裝 InputStream | 不知道目標方法 | 不行 |
+| HandlerInterceptor | 只有 HttpServletRequest | 要自己反射找 | 只有 ModelAndView |
+| **AOP @Around** | 直接從方法參數取 | `@annotation(loggable)` | `joinPoint.proceed()` 回傳值 |
 
-### 兩個 Pointcut 的分工
-
-```java
-// 1. 沒有 @Loggable 的 RestController 方法 → 用預設值
-@Around("@within(RestController) && !@annotation(Loggable)")
-
-// 2. 有 @Loggable 的方法 → 用註解上的自訂值
-@Around("@annotation(loggable)")
-```
-
-### EnvironmentPostProcessor vs @Configuration
+#### EnvironmentPostProcessor vs @Configuration
 
 Log pattern 必須在 **logging 系統初始化之前** 設定好，一般的 `@Bean` 太晚了。
 
@@ -267,7 +316,7 @@ Log pattern 必須在 **logging 系統初始化之前** 設定好，一般的 `@
 - 用 `addLast`（最低優先序）加入，使用方在 `application.yml` 設的值自動覆蓋
 - Spring Boot 4.x 中 EPP 透過 `spring.factories` 註冊（`.imports` 只用於 AutoConfiguration）
 
-### Micrometer Tracing 怎麼運作
+#### Micrometer Tracing 流程
 
 ```
 HTTP Request 進來
@@ -293,29 +342,22 @@ TracingFilter finally
 traceparent: 00-{traceId}-{spanId}-{flags}
 ```
 
-### 敏感遮罩原理
+---
 
-```
-任意物件 → Jackson convertValue → Map<String, Object> → 遍歷 key 遮罩 → 簡潔格式輸出
-```
+## 版本
 
-支援 Map、POJO、List，不需要知道具體型別。
+### 1.0.0
+
+- Micrometer Tracing 整合
+- API Log Aspect（`-->` / `<--` 箭頭格式）
+- Request Body 記錄 + 敏感遮罩
+- Response Body Logging（預設關閉，可選開啟）
+- Slow API 告警（[SLOW] 標記）
+- TracingFilter（MDC traceId/spanId 注入）
+- @Loggable 註解
 
 ---
 
 ## TODO / Roadmap
 
 - [ ] **JSON Log 格式** — 給 OpenSearch / ELK 用的結構化日誌輸出
-
----
-
-## 版本
-
-- 1.0.0
-  - Micrometer Tracing 整合
-  - API Log Aspect（`-->` / `<--` 箭頭格式）
-  - Request Body 記錄 + 敏感遮罩
-  - Response Body Logging（預設關閉，可選開啟）
-  - Slow API 告警（[SLOW] 標記）
-  - TracingFilter（MDC traceId/spanId 注入）
-  - @Loggable 註解

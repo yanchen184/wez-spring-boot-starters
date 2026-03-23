@@ -1,236 +1,264 @@
-# care-security-spring-boot-starter
+# Common Security Spring Boot Starter
 
-Spring Boot 4.0 + Spring Security 7 的安全框架 Starter，提供 JWT 認證、RBAC 權限、帳號管理等功能，加一個依賴即可開箱即用。
+安全框架模組 — JWT 認證、RBAC 權限、帳號管理、可選 LDAP / OTP / CAPTCHA / 自然人憑證
 
-## 技術棧
+---
 
-- Spring Boot 4.0.3 / Spring Security 7
-- Spring Authorization Server (OAuth2 JWT)
-- Spring Data JPA + Redis
-- MSSQL (SQL Server)
-- Password4j (SHA-512 密碼加密)
-- SpringDoc OpenAPI 3 (Swagger UI)
+## 目錄
 
-## 模組結構
+1. [加入後你的專案自動獲得](#加入後你的專案自動獲得)
+2. [快速開始](#快速開始)
+3. [功能總覽](#功能總覽)
+4. [核心 API](#核心-api)
+5. [配置](#配置)
+6. [設計決策](#設計決策)
+7. [依賴關係](#依賴關係)
+8. [專案結構與技術規格](#專案結構與技術規格)
+9. [版本](#版本)
 
-```
-care-security/                          # Parent POM (Multi-module)
-├── pom.xml
-├── docs/                               # 技術文件
-│
-├── care-security-core/                 # 核心模組：所有業務邏輯
-│   └── src/main/java/gov/mohw/care/security/
-│       ├── config/                     # 框架配置
-│       ├── controller/                 # REST API
-│       ├── dto/                        # 請求/回應 DTO
-│       ├── entity/                     # JPA Entity
-│       ├── exception/                  # 全域例外處理
-│       ├── repository/                 # Spring Data JPA Repository
-│       ├── security/                   # 認證/授權核心元件
-│       └── service/                    # 業務邏輯服務
-│
-├── care-security-autoconfigure/        # 自動配置模組
-│   └── src/main/java/.../autoconfigure/
-│       ├── CareSecurityAutoConfiguration.java
-│       └── CareSecurityProperties.java
-│
-├── care-security-starter/              # Starter 空殼（只拉依賴）
-│   └── pom.xml
-│
-└── care-security-test/                 # 測試模組 (95 個測試)
-    └── src/test/java/.../test/
-        ├── Phase1 ~ Phase9 測試
-        └── TestApplication.java
-```
+---
 
-### care-security-core
+## 加入後你的專案自動獲得
 
-框架的核心程式碼，包含所有業務邏輯。
+| 功能 | 加入前 | 加入後 |
+|------|--------|--------|
+| JWT 認證 | 需要自己整合 Spring Security + JWT | Access Token + Refresh Token + 黑名單，開箱即用 |
+| 權限控制 | 需要自己設計角色權限表 | RBAC 權限矩陣（Menu × CRUD），支援 `@PreAuthorize` |
+| 使用者管理 | 需要自己寫 CRUD | REST API 含建立、鎖定/解鎖、重設密碼 |
+| 密碼安全 | 需要自己處理加密和政策 | SHA-512 加密 + 密碼歷史 + 複雜度/長度政策 |
+| 登入保護 | 沒有暴力破解防護 | 失敗鎖定（Redis 計數）+ CAPTCHA + OTP 可選 |
+| 稽核日誌 | 需要自己記錄 | 登入紀錄 + 操作日誌自動記錄 |
+| Swagger UI | 需要自己配置 Bearer Token | 自動配置 SpringDoc OpenAPI + Bearer 認證 |
+| 可選認證 | — | LDAP、OTP、CAPTCHA、自然人憑證，加依賴即啟用 |
 
-#### config/ — 框架配置
+---
 
-| 檔案 | 說明 |
-|------|------|
-| `SecurityConfig.java` | Spring Security FilterChain 配置（3 條鏈：Authorization Server、Resource Server、Default），整合 CORS 與 RBAC |
-| `AuthorizationServerConfig.java` | OAuth2 Authorization Server 設定（JWT 簽發、Token 自訂欄位） |
-| `CorsConfig.java` | CORS 跨域配置（允許來源從 `care.security.cors.allowed-origins` 讀取） |
-| `PasswordEncoderConfig.java` | 密碼編碼器（SHA-512 + Base64 Salt，格式：`{SHA-512}{salt}hash`） |
-| `RedisConfig.java` | Redis 序列化配置（String key + JSON value） |
-| `OpenApiConfig.java` | Swagger UI 配置（Bearer Token 認證） |
+## 快速開始
 
-#### controller/ — REST API
-
-| 檔案 | 路徑前綴 | 說明 |
-|------|----------|------|
-| `AuthController.java` | `/api/auth` | 登入、登出、刷新 Token、修改密碼 |
-| `UserController.java` | `/api/users` | 使用者 CRUD、鎖定/解鎖、重設密碼 |
-| `RoleController.java` | `/api/roles` | 角色管理、權限矩陣 CRUD |
-| `MenuController.java` | `/api/menus` | 選單樹查詢 |
-| `OrganizeController.java` | `/api/orgs` | 組織樹查詢 |
-
-#### dto/ — 資料傳輸物件
-
-| 子目錄 | 檔案 | 說明 |
-|--------|------|------|
-| `request/` | `LoginRequest` | 登入（帳號 + 密碼） |
-| | `RefreshTokenRequest` | 刷新 Token |
-| | `LogoutRequest` | 登出（帶 access token） |
-| | `ChangePasswordRequest` | 修改密碼（舊密碼 + 新密碼） |
-| | `CreateUserRequest` | 建立使用者 |
-| | `UpdateUserRequest` | 更新使用者 |
-| | `ResetPasswordRequest` | 重設密碼（管理員操作） |
-| | `RolePermissionRequest` | 更新角色的權限矩陣 |
-| `response/` | `ApiResponse<T>` | 統一 API 回應格式 |
-| | `TokenResponse` | JWT Token 回應（access + refresh） |
-| | `UserResponse` | 使用者資訊 |
-| | `RoleResponse` | 角色資訊 |
-| | `MenuTreeResponse` | 選單樹節點 |
-| | `OrganizeTreeResponse` | 組織樹節點 |
-| | `PermissionMatrixResponse` | 權限矩陣（選單 × CRUD） |
-
-#### entity/ — JPA 實體（對應資料庫表）
-
-| 檔案 | 對應表 | 說明 |
-|------|--------|------|
-| `SaUser.java` | SAUSER | 後台使用者帳號 |
-| `Role.java` | ROLE | 角色 |
-| `SaUserRole.java` | SAUSER_ROLE | 使用者-角色關聯（多對多） |
-| `SaUserOrgRole.java` | SAUSER_ORG_ROLE | 使用者-組織-角色三方關聯 |
-| `Perm.java` | PERM | 權限（CRUD 欄位） |
-| `RolePerms.java` | ROLE_PERMS | 角色-權限關聯 |
-| `Menu.java` | MENU | 選單（樹狀結構） |
-| `Organize.java` | ORGANIZE | 組織（樹狀結構） |
-| `PwdHistory.java` | PWD_HISTORY | 密碼歷史（防止重複使用） |
-| `LoginHistory.java` | LOGIN_HISTORY | 登入紀錄 |
-| `AuditLog.java` | AUDIT_LOG | 稽核日誌 |
-| `RequestMap.java` | REQUESTMAP | URL-角色對應 |
-| `base/AuditableEntity.java` | — | 審計基底類（建立/修改時間+人員） |
-| `id/SaUserRoleId.java` | — | 複合主鍵 |
-| `id/RolePermsId.java` | — | 複合主鍵 |
-
-#### security/ — 認證授權核心
-
-| 檔案 | 說明 |
-|------|------|
-| `CustomUserDetailsService.java` | 從 DB 載入使用者、角色、權限，轉為 Spring Security UserDetails |
-| `CustomUserDetails.java` | 自訂 UserDetails（含組織角色、權限碼） |
-| `JwtTokenCustomizer.java` | 在 JWT 中加入 userId、roles、permissions 等自訂欄位 |
-| `LoginAttemptService.java` | 登入失敗次數追蹤、帳號鎖定（使用 Redis） |
-| `RedisTokenBlacklistService.java` | JWT 黑名單（登出後 Token 立即失效） |
-| `CrudPermissionEvaluator.java` | RBAC 權限評估器（支援 `@PreAuthorize("hasPermission('SC900','READ')")` 語法） |
-
-#### service/ — 業務邏輯
-
-| 檔案 | 說明 |
-|------|------|
-| `AuthService.java` | 登入驗證、JWT 簽發/刷新、登出、改密碼 |
-| `UserService.java` | 使用者 CRUD、鎖定/解鎖、重設密碼 |
-| `RoleService.java` | 角色查詢、權限矩陣管理 |
-| `MenuService.java` | 選單樹建構 |
-| `OrganizeService.java` | 組織樹建構 |
-| `AuditService.java` | 稽核日誌寫入 |
-
-#### repository/ — 資料存取
-
-| 檔案 | 說明 |
-|------|------|
-| `SaUserRepository.java` | 使用者查詢（含 by account） |
-| `RoleRepository.java` | 角色查詢 |
-| `SaUserRoleRepository.java` | 使用者-角色關聯 |
-| `SaUserOrgRoleRepository.java` | 使用者-組織-角色關聯 |
-| `PermRepository.java` | 權限查詢 |
-| `RolePermsRepository.java` | 角色-權限關聯 |
-| `MenuRepository.java` | 選單查詢 |
-| `OrganizeRepository.java` | 組織查詢 |
-| `PwdHistoryRepository.java` | 密碼歷史 |
-| `LoginHistoryRepository.java` | 登入紀錄 |
-| `AuditLogRepository.java` | 稽核日誌 |
-
-#### exception/
-
-| 檔案 | 說明 |
-|------|------|
-| `GlobalExceptionHandler.java` | 全域例外處理（統一回傳 `ApiResponse` 格式） |
-
-### care-security-autoconfigure
-
-Spring Boot 自動配置模組，讓使用者加依賴就能用。
-
-| 檔案 | 說明 |
-|------|------|
-| `CareSecurityAutoConfiguration.java` | 自動註冊所有 Bean（SecurityConfig、CorsConfig、PasswordEncoder、Redis、JPA、Controller 等），支援 `@ConditionalOnMissingBean` 讓使用者覆寫 |
-| `CareSecurityProperties.java` | 配置屬性類，綁定 `care.security.*` 前綴（JWT TTL、登入鎖定、CORS 等） |
-| `META-INF/spring/...AutoConfiguration.imports` | Spring Boot 4 的自動配置註冊檔 |
-
-### care-security-starter
-
-空殼模組，只在 pom.xml 中引入 `care-security-autoconfigure`。使用者只需依賴這一個 artifact。
-
-### care-security-test
-
-95 個測試，分 9 個 Phase：
-
-| Phase | 檔案 | 測試內容 |
-|-------|------|----------|
-| 1 | `Phase1_DataLayerTest.java` | Entity、Repository 資料層 |
-| 2 | `Phase2_UserDetailsServiceTest.java` | UserDetailsService 載入使用者 |
-| 3 | `Phase3_PasswordEncoderTest.java` | SHA-512 密碼編碼/驗證 |
-| 4 | `Phase4_LoginFlowTest.java` | 登入流程（成功、失敗、鎖定） |
-| 5 | `Phase5_JwtTokenTest.java` | JWT 簽發、解析、過期 |
-| 6 | `Phase6_RbacPermissionTest.java` | RBAC 權限評估 |
-| 7 | `Phase7_RedisBlacklistTest.java` | Redis Token 黑名單 |
-| 8 | `Phase8_AuthControllerIntegrationTest.java` | AuthController 整合測試 |
-| 9 | `Phase9_AutoConfigurationTest.java` | 自動配置 Bean 載入驗證 |
-
-### docs/ — 技術文件
-
-| 檔案 | 說明 |
-|------|------|
-| `01-Spring-Boot-4-技術選型報告.md` | Spring Boot 4 技術選型分析 |
-| `02-PoC-審查報告.md` | 概念驗證審查 |
-| `03-RBAC-重構方案.md` | RBAC 權限架構重構設計 |
-| `TDD-Design-Specification.md` | TDD 測試規格書（9 Phase） |
-
-## 使用方式
-
-### 1. 安裝到 Local Maven Repository
-
-```bash
-export JAVA_HOME="C:/jdk21/jdk-21.0.10+7"
-export PATH="/c/workspace/apache-maven-3.9.9/bin:$PATH"
-mvn clean install -DskipTests
-```
-
-### 2. 在應用專案中引入
+### 1. 引入依賴
 
 ```xml
 <dependency>
-    <groupId>gov.mohw.care</groupId>
-    <artifactId>care-security-starter</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <groupId>com.company.common</groupId>
+    <artifactId>common-security-spring-boot-starter</artifactId>
 </dependency>
 ```
 
-### 3. 配置 application.yml
+### 2. 配置資料庫和 Redis
 
 ```yaml
+spring:
+  datasource:
+    url: jdbc:sqlserver://localhost:1433;databaseName=care_security
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
 care:
   security:
-    enabled: true
     jwt:
       access-token-ttl-minutes: 30
       refresh-token-ttl-days: 7
-    login:
-      max-attempts: 5
-      lock-duration-minutes: 30
     cors:
       allowed-origins: http://localhost:3000
 ```
 
-完整的 Demo 專案請參考 [security-starter-demo](https://github.com/yanchen184/security-starter-demo)。
+### 3. 完成
 
-## 執行測試
+REST API 自動註冊（`/api/auth/*`、`/api/users/*`、`/api/roles/*` 等）。
 
-```bash
-mvn test    # 95 個測試全部通過
+> Demo 專案：[security-starter-demo](https://github.com/yanchen184/security-starter-demo)
+
+---
+
+## 功能總覽
+
+- **JWT 認證** — OAuth2 Authorization Server，Access + Refresh Token，Token 黑名單（登出即失效）
+- **RBAC 權限** — 角色 → 權限矩陣（Menu × CRUD），支援 `@PreAuthorize("hasPermission('SC900','READ')")`
+- **使用者管理** — CRUD、鎖定/解鎖、重設密碼、密碼歷史檢查
+- **密碼政策** — 長度、複雜度、歷史密碼、到期提醒
+- **登入保護** — 失敗次數追蹤 + 帳號鎖定（Redis）
+- **稽核日誌** — 登入紀錄、操作日誌
+- **LDAP** — Active Directory / OpenLDAP 整合（可選）
+- **OTP** — TOTP 兩步驟驗證（可選）
+- **CAPTCHA** — 圖形驗證碼 + TTS 語音無障礙（可選）
+- **自然人憑證** — MOICA 數位簽章認證 + OCSP/CRL 撤銷檢查（可選）
+
+---
+
+## 核心 API
+
+### REST 端點
+
+| Controller | 路徑前綴 | 主要操作 |
+|-----------|----------|---------|
+| `AuthController` | `/api/auth` | 登入、登出、刷新 Token、修改密碼 |
+| `UserController` | `/api/users` | 使用者 CRUD、鎖定/解鎖、重設密碼 |
+| `RoleController` | `/api/roles` | 角色管理、權限矩陣 CRUD |
+| `MenuController` | `/api/menus` | 選單樹查詢 |
+| `OrganizeController` | `/api/orgs` | 組織樹查詢 |
+
+### 可選模組端點
+
+| 模組 | Controller | 路徑 | 說明 |
+|------|-----------|------|------|
+| LDAP | `LdapController` | `/api/auth/ldap/login` | LDAP 認證登入 |
+| OTP | `OtpController` | `/api/auth/otp/*` | 綁定/驗證 TOTP |
+| CAPTCHA | `CaptchaController` | `/api/auth/captcha` | 取得/驗證圖形驗證碼 |
+| MOICA | `CitizenCertController` | `/api/auth/cert/*` | 自然人憑證挑戰/登入 |
+
+### 權限控制範例
+
+```java
+// 使用 RBAC 權限矩陣
+@PreAuthorize("hasPermission('SC900', 'READ')")
+@GetMapping("/api/reports")
+public List<Report> list() { ... }
+
+@PreAuthorize("hasPermission('SC900', 'CREATE')")
+@PostMapping("/api/reports")
+public Report create(@RequestBody ReportRequest req) { ... }
 ```
+
+---
+
+## 配置
+
+```yaml
+care:
+  security:
+    enabled: true                              # 是否啟用（預設 true）
+    jwt:
+      access-token-ttl-minutes: 30             # Access Token 有效時間
+      refresh-token-ttl-days: 7                # Refresh Token 有效天數
+      keystore-path: ./keys/jwt-keys.json      # JWK 金鑰路徑
+    login:
+      max-attempts: 5                          # 最大失敗次數
+      lock-duration-minutes: 30                # 鎖定時間
+    cors:
+      allowed-origins: http://localhost:3000    # CORS 允許來源
+    password:                                   # 密碼政策
+      min-length: 8
+      require-uppercase: true
+      require-lowercase: true
+      require-digit: true
+      require-special: false
+      history-count: 3                          # 不可重複最近 N 次密碼
+    web:
+      public-endpoints:                         # 不需認證的路徑
+        - /api/auth/login
+        - /api/auth/refresh
+        - /api/auth/captcha
+        - /api/auth/captcha/audio/**
+
+    # === 可選模組 ===
+    ldap:
+      enabled: false                           # 啟用 LDAP（預設關）
+      url: ldap://localhost:389
+      base-dn: dc=example,dc=com
+      user-search-filter: (sAMAccountName={0})
+    otp:
+      enabled: false                           # 啟用 OTP（預設關）
+      issuer: CareSecuritySystem
+    captcha:
+      enabled: false                           # 啟用 CAPTCHA（預設關）
+      length: 4
+      expire-seconds: 300
+      audio-enabled: false                     # TTS 語音驗證碼
+    citizen-cert:
+      enabled: false                           # 啟用自然人憑證（預設關）
+      ocsp-enabled: true
+      crl-enabled: true
+      crl-cache-ttl-hours: 1
+      ocsp-connect-timeout-ms: 5000
+      ocsp-read-timeout-ms: 10000
+      crl-connect-timeout-ms: 5000
+      crl-read-timeout-ms: 15000
+```
+
+---
+
+## 設計決策
+
+### 要什麼
+
+| 決策 | 原因 |
+|------|------|
+| OAuth2 Authorization Server | 標準協定，支援跨服務認證 |
+| RBAC 權限矩陣（Menu × CRUD） | 精細到每個功能頁面的 CRUD 控制 |
+| 可插拔認證模組 | LDAP、OTP、CAPTCHA、MOICA 各自獨立，加依賴即啟用 |
+| Redis Token 黑名單 | 登出後 Token 立即失效，不用等到期 |
+| 密碼歷史 | 防止使用者循環使用同一組密碼 |
+| SHA-512 + Salt | Password4j 實作，比 bcrypt 更快且安全足夠 |
+
+### 不要什麼
+
+| 決策 | 原因 |
+|------|------|
+| Session 認證 | RESTful API 使用 Stateless JWT |
+| 前端程式碼 | 前後端分離，前端由消費端自行實作 |
+| 內建 Email 發送 | 密碼重設通知由消費端整合 |
+| 多租戶 | 目前為單租戶設計，避免過度複雜 |
+
+---
+
+## 依賴關係
+
+```
+common-security-spring-boot-starter
+└── common-security-autoconfigure
+    └── common-security-core
+        ├── common-log-spring-boot-starter        ← 日誌
+        ├── common-response-spring-boot-starter   ← 統一回應
+        └── common-jpa-spring-boot-starter        ← Entity 審計
+
+可選模組（各自獨立，加依賴即啟用）：
+├── common-security-auth-ldap       ← LDAP 認證
+├── common-security-auth-otp        ← TOTP 兩步驟驗證
+├── common-security-auth-captcha    ← 圖形驗證碼
+└── common-security-auth-moica      ← 自然人憑證
+    └── common-security-cert-core   ← 憑證驗證共用工具
+```
+
+---
+
+## 專案結構與技術規格
+
+```
+care-security/
+├── common-security-core/              # 核心：Entity + Service + Controller + Security
+│   ├── config/                        框架配置（SecurityConfig, CORS, OpenAPI...）
+│   ├── controller/                    REST API
+│   ├── dto/request/ + response/       DTO
+│   ├── entity/                        JPA Entity（SaUser, Role, Perm, Menu...）
+│   ├── repository/                    Spring Data JPA
+│   ├── security/                      認證授權（UserDetails, JWT, RBAC, Redis 黑名單）
+│   └── service/                       業務邏輯
+├── common-security-cert-core/         # 憑證驗證共用（OCSP + CRL）
+├── common-security-auth-ldap/         # LDAP 認證
+├── common-security-auth-otp/          # TOTP 兩步驟驗證
+├── common-security-auth-captcha/      # 圖形驗證碼 + TTS
+├── common-security-auth-moica/        # 自然人憑證
+├── common-security-autoconfigure/     # AutoConfiguration
+├── common-security-spring-boot-starter/ # Starter 空殼
+└── common-security-test/              # 207 個整合測試（9 Phase）
+```
+
+| 項目 | 值 |
+|------|-----|
+| Java | 21 |
+| Spring Boot | 4.0.3 |
+| Spring Security | 7.x |
+| OAuth2 | Spring Authorization Server |
+| 資料庫 | MSSQL (SQL Server) |
+| 快取 | Redis |
+| 密碼加密 | Password4j (SHA-512) |
+| API 文件 | SpringDoc OpenAPI 3 |
+| 自動配置 | `AutoConfiguration.imports` |
+
+---
+
+## 版本
+
+- 1.0.0 — 初始版本：JWT 認證、RBAC、使用者管理、LDAP、OTP、CAPTCHA、自然人憑證、密碼政策、稽核日誌

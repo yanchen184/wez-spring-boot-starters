@@ -4,12 +4,28 @@ JPA 通用模組 — 自動審計、可選軟刪除、預設 AuditorAware
 
 ---
 
-## 功能總覽
+## 目錄
 
-- **自動審計** — 所有繼承 `AuditableEntity` 的實體自動記錄建立/修改時間與操作人
-- **AuditorAware** — 從 Spring Security SecurityContext 自動取得當前使用者
-- **可選軟刪除** — 需要時才繼承 `BaseEntity`，搭配 `SoftDeleteRepository`
-- **零配置** — 引入依賴即自動生效
+- [加入後你的專案自動獲得](#加入後你的專案自動獲得)
+- [快速開始](#快速開始)
+- [功能總覽](#功能總覽)
+- [核心 API](#核心-api)
+- [配置](#配置)
+- [設計決策](#設計決策)
+- [依賴關係](#依賴關係)
+- [專案結構與技術規格](#專案結構與技術規格)
+- [版本](#版本)
+
+---
+
+## 加入後你的專案自動獲得
+
+| 功能 | 加入前 | 加入後 |
+|------|--------|--------|
+| 審計欄位 | 需要每個 Entity 手動加 createdDate 等 4 個欄位 | 繼承 `AuditableEntity` 自動獲得 |
+| 審計人 | 需要手動塞 `createdBy` / `lastModifiedBy` | 自動從 SecurityContext 取得當前使用者 |
+| 軟刪除 | 需要自己寫 `deleted` 欄位 + 自訂 query | 繼承 `BaseEntity` + `SoftDeleteRepository` 即有完整 API |
+| 配置 | 需要自己加 `@EnableJpaAuditing` | 零配置，引入依賴即生效 |
 
 ---
 
@@ -55,7 +71,18 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
 ---
 
-## 審計欄位
+## 功能總覽
+
+- **自動審計** — 所有繼承 `AuditableEntity` 的實體自動記錄建立/修改時間與操作人
+- **AuditorAware** — 從 Spring Security SecurityContext 自動取得當前使用者
+- **可選軟刪除** — 需要時才繼承 `BaseEntity`，搭配 `SoftDeleteRepository`
+- **零配置** — 引入依賴即自動生效
+
+---
+
+## 核心 API
+
+### 審計欄位
 
 繼承 `AuditableEntity` 後自動獲得：
 
@@ -70,9 +97,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
 無認證時（排程、系統初始化）：回傳 `"SYSTEM"`
 
----
-
-## Entity 繼承結構
+### Entity 繼承結構
 
 ```
 AuditableEntity                       <-- 大部分實體用這個
@@ -94,9 +119,36 @@ BaseEntity extends AuditableEntity    <-- 真的需要軟刪除才用
 | 一般 CRUD | `AuditableEntity` | `JpaRepository` |
 | 需要軟刪除 | `BaseEntity` | `SoftDeleteRepository` |
 
----
+### SoftDeleteRepository API
 
-## 自訂 AuditorAware
+| 方法 | 回傳 | 說明 |
+|------|------|------|
+| `findAllActive()` | `List<T>` | 查詢未刪除 |
+| `findAllActive(Pageable)` | `Page<T>` | 分頁查詢未刪除 |
+| `findByIdActive(id)` | `Optional<T>` | 按 ID 查詢未刪除 |
+| `findAllByIdActive(ids)` | `List<T>` | 批次查詢未刪除 |
+| `softDeleteById(id)` | `int` | 邏輯刪除 |
+| `softDeleteByIds(ids)` | `int` | 批次邏輯刪除 |
+| `restoreById(id)` | `int` | 恢復刪除 |
+| `countActive()` | `long` | 統計未刪除數量 |
+| `existsByIdActive(id)` | `boolean` | 是否存在且未刪除 |
+
+### 軟刪除用法
+
+```java
+@Entity
+public class ImportantRecord extends BaseEntity {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String content;
+}
+
+public interface ImportantRecordRepository
+        extends SoftDeleteRepository<ImportantRecord, Long> {
+}
+```
+
+### 自訂 AuditorAware
 
 預設的 `DefaultAuditorAware` 從 SecurityContext 取使用者名稱。消費端可覆蓋：
 
@@ -109,9 +161,7 @@ public AuditorAware<String> auditorAware() {
 
 定義後預設 Bean 自動停用（`@ConditionalOnMissingBean`）。
 
----
-
-## 欄位名映射
+### 欄位名映射
 
 DB 欄位名與預設不同時，用 `@AttributeOverride`：
 
@@ -128,36 +178,11 @@ public class LegacyTable extends AuditableEntity {
 
 ---
 
-## 軟刪除（Opt-in）
+## 配置
 
-需要軟刪除時，改繼承 `BaseEntity` + 使用 `SoftDeleteRepository`：
+零配置，引入即生效。
 
-```java
-@Entity
-public class ImportantRecord extends BaseEntity {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private String content;
-}
-
-public interface ImportantRecordRepository
-        extends SoftDeleteRepository<ImportantRecord, Long> {
-}
-```
-
-### SoftDeleteRepository API
-
-| 方法 | 回傳 | 說明 |
-|------|------|------|
-| `findAllActive()` | `List<T>` | 查詢未刪除 |
-| `findAllActive(Pageable)` | `Page<T>` | 分頁查詢未刪除 |
-| `findByIdActive(id)` | `Optional<T>` | 按 ID 查詢未刪除 |
-| `findAllByIdActive(ids)` | `List<T>` | 批次查詢未刪除 |
-| `softDeleteById(id)` | `int` | 邏輯刪除 |
-| `softDeleteByIds(ids)` | `int` | 批次邏輯刪除 |
-| `restoreById(id)` | `int` | 恢復刪除 |
-| `countActive()` | `long` | 統計未刪除數量 |
-| `existsByIdActive(id)` | `boolean` | 是否存在且未刪除 |
+不需要任何 `application.yml` 設定。`@EnableJpaAuditing` 由 starter 條件式自動啟用，不與消費端的設定衝突。
 
 ---
 
@@ -191,7 +216,19 @@ public interface ImportantRecordRepository
 
 ---
 
-## 專案結構
+## 依賴關係
+
+```
+common-jpa-spring-boot-starter
+├── spring-boot-starter-data-jpa (provided)
+└── spring-security-core (provided, 用於 AuditorAware)
+```
+
+---
+
+## 專案結構與技術規格
+
+### 目錄樹
 
 ```
 common-jpa-spring-boot-starter/
@@ -209,9 +246,7 @@ common-jpa-spring-boot-starter/
 └── pom.xml
 ```
 
----
-
-## 技術規格
+### 技術規格
 
 | 項目 | 值 |
 |------|-----|
@@ -226,9 +261,10 @@ common-jpa-spring-boot-starter/
 
 ## 版本
 
-- 1.0.0
-  - AuditableEntity（4 審計欄位）
-  - BaseEntity（審計 + 軟刪除 + 樂觀鎖，opt-in）
-  - SoftDeleteRepository（含分頁）
-  - DefaultAuditorAware（SecurityContext）
-  - 條件式 @EnableJpaAuditing（不與消費端衝突）
+### 1.0.0
+
+- AuditableEntity（4 審計欄位）
+- BaseEntity（審計 + 軟刪除 + 樂觀鎖，opt-in）
+- SoftDeleteRepository（含分頁）
+- DefaultAuditorAware（SecurityContext）
+- 條件式 @EnableJpaAuditing（不與消費端衝突）
