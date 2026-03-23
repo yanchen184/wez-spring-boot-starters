@@ -128,7 +128,7 @@
             <!-- ========== Business Starters ========== -->
             <dependency>
                 <groupId>com.company.common</groupId>
-                <artifactId>common-signature-spring-boot-starter</artifactId>
+                <artifactId>common-diagram-spring-boot-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

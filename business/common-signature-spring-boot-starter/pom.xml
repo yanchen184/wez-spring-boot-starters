@@ -11,9 +11,9 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>common-signature-spring-boot-starter</artifactId>
-    <name>Common Signature Spring Boot Starter</name>
-    <description>電子簽名板 Starter — Canvas 簽名 JSON 存儲 + 附件圖片管理</description>
+    <artifactId>common-diagram-spring-boot-starter</artifactId>
+    <name>Common Diagram Spring Boot Starter</name>
+    <description>通用圖表 Starter — 支援電子簽名、家系圖等多種圖表類型的 JSON 存儲 + 附件圖片管理</description>
 
     <dependencies>
         <!-- Spring Boot -->
