@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-security-auth-moica</artifactId>
-    <name>common-security-auth-moica</name>
+    <name>Common Security Auth MOICA</name>
     <description>MOICA Citizen Digital Certificate (自然人憑證) Authentication</description>
 
     <dependencies>

@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-report-engine-xdocreport</artifactId>
-    <name>common-report-engine-xdocreport</name>
+    <name>Common Report Engine XDocReport</name>
     <description>Common Report xDocReport Engine</description>
 
     <dependencies>

@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-report-core</artifactId>
-    <name>common-report-core</name>
+    <name>Common Report Core</name>
     <description>Common Report Core Library</description>
 
     <dependencies>

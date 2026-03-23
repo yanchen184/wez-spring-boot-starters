@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-security-auth-captcha</artifactId>
-    <name>common-security-auth-captcha</name>
+    <name>Common Security Auth Captcha</name>
     <description>Captcha (圖形驗證碼) Support</description>
 
     <dependencies>

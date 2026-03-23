@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-report-engine-easyexcel</artifactId>
-    <name>common-report-engine-easyexcel</name>
+    <name>Common Report Engine EasyExcel</name>
     <description>Common Report EasyExcel Engine</description>
 
     <dependencies>

@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-security-core</artifactId>
-    <name>common-security-core</name>
+    <name>Common Security Core</name>
     <description>Common Security Core Library</description>
 
     <dependencies>

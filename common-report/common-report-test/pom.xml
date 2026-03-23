@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-report-test</artifactId>
-    <name>common-report-test</name>
+    <name>Common Report Test</name>
     <description>Common Report Integration Tests</description>
 
     <dependencies>

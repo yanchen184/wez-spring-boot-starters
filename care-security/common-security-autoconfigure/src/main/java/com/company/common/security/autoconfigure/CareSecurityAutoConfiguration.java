@@ -84,6 +84,12 @@ import java.util.function.Supplier;
 )
 @EntityScan(basePackages = "com.company.common.security.entity")
 @EnableJpaRepositories(basePackages = "com.company.common.security.repository")
+/**
+ * 安全模組自動配置
+ *
+ * <p>註冊 JWT 認證、RBAC 權限、使用者管理、稽核日誌等核心 Bean。
+ * 可選模組（LDAP、OTP、CAPTCHA、MOICA）由各自的 AutoConfiguration 獨立註冊。
+ */
 public class CareSecurityAutoConfiguration {
 
     // ===== Config Beans (replacing new XxxConfig() anti-pattern) =====

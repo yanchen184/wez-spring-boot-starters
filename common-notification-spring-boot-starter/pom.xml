@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-notification-spring-boot-starter</artifactId>
-    <name>common-notification-spring-boot-starter</name>
+    <name>Common Notification Spring Boot Starter</name>
     <description>Notification starter with multi-channel support (Email, WebSocket), scheduling, retry, and status tracking</description>
 
     <dependencies>

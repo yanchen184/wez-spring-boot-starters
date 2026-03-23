@@ -26,6 +26,11 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import java.nio.file.Path;
 import java.util.List;
 
+/**
+ * 附件管理模組自動配置
+ *
+ * <p>註冊 {@link AttachmentService}、儲存策略（檔案系統 / DB）、圖片處理、驗證器、REST Controller。
+ */
 @AutoConfiguration
 @ConditionalOnClass(name = "org.springframework.data.jpa.repository.JpaRepository")
 @EnableConfigurationProperties(AttachmentProperties.class)

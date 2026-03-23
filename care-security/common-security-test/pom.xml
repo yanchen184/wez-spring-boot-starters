@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-security-test</artifactId>
-    <name>common-security-test</name>
+    <name>Common Security Test</name>
     <description>Common Security Integration Tests</description>
 
     <dependencies>

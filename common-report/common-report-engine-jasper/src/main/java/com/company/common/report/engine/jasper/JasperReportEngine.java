@@ -47,8 +47,6 @@ public class JasperReportEngine implements ReportEngine {
 
     private static final Logger log = LoggerFactory.getLogger(JasperReportEngine.class);
 
-    private static final long MAX_FILE_SIZE = 50L * 1024 * 1024;
-
     private static final Set<OutputFormat> SUPPORTED_FORMATS = Set.of(
             OutputFormat.PDF, OutputFormat.XLSX
     );

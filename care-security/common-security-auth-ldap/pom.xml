@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-security-auth-ldap</artifactId>
-    <name>common-security-auth-ldap</name>
+    <name>Common Security Auth LDAP</name>
     <description>LDAP Authentication Support</description>
 
     <dependencies>

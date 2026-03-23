@@ -184,6 +184,14 @@ public class CareSecurityProperties {
         private boolean ocspEnabled = true;
         private boolean crlEnabled = true;
         private int crlCacheTtlHours = 1;
+        /** OCSP 連線超時（毫秒） */
+        private int ocspConnectTimeoutMs = 5000;
+        /** OCSP 讀取超時（毫秒） */
+        private int ocspReadTimeoutMs = 10000;
+        /** CRL 連線超時（毫秒） */
+        private int crlConnectTimeoutMs = 5000;
+        /** CRL 讀取超時（毫秒） */
+        private int crlReadTimeoutMs = 15000;
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -203,5 +211,13 @@ public class CareSecurityProperties {
         public void setCrlEnabled(boolean crlEnabled) { this.crlEnabled = crlEnabled; }
         public int getCrlCacheTtlHours() { return crlCacheTtlHours; }
         public void setCrlCacheTtlHours(int crlCacheTtlHours) { this.crlCacheTtlHours = crlCacheTtlHours; }
+        public int getOcspConnectTimeoutMs() { return ocspConnectTimeoutMs; }
+        public void setOcspConnectTimeoutMs(int ocspConnectTimeoutMs) { this.ocspConnectTimeoutMs = ocspConnectTimeoutMs; }
+        public int getOcspReadTimeoutMs() { return ocspReadTimeoutMs; }
+        public void setOcspReadTimeoutMs(int ocspReadTimeoutMs) { this.ocspReadTimeoutMs = ocspReadTimeoutMs; }
+        public int getCrlConnectTimeoutMs() { return crlConnectTimeoutMs; }
+        public void setCrlConnectTimeoutMs(int crlConnectTimeoutMs) { this.crlConnectTimeoutMs = crlConnectTimeoutMs; }
+        public int getCrlReadTimeoutMs() { return crlReadTimeoutMs; }
+        public void setCrlReadTimeoutMs(int crlReadTimeoutMs) { this.crlReadTimeoutMs = crlReadTimeoutMs; }
     }
 }

@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-report-autoconfigure</artifactId>
-    <name>common-report-autoconfigure</name>
+    <name>Common Report Autoconfigure</name>
     <description>Common Report Auto Configuration</description>
 
     <dependencies>

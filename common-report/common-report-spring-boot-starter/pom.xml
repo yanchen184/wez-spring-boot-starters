@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-report-spring-boot-starter</artifactId>
-    <name>common-report-spring-boot-starter</name>
+    <name>Common Report Spring Boot Starter</name>
     <description>Common Report Spring Boot Starter</description>
 
     <dependencies>

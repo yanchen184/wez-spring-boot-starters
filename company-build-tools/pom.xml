@@ -13,7 +13,7 @@
     <artifactId>company-build-tools</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
-    <name>company-build-tools</name>
+    <name>Company Build Tools</name>
     <description>公司統一 Build 規則：Checkstyle、SpotBugs 規則檔，所有後端專案共用</description>
 
     <properties>

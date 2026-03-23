@@ -13,6 +13,9 @@ import java.util.List;
  */
 public interface ReportEngine {
 
+    /** 報表產製結果的檔案大小上限（50 MB） */
+    long MAX_FILE_SIZE = 50L * 1024 * 1024;
+
     /**
      * 回傳此引擎的類型
      */

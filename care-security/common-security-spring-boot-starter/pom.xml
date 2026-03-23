@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-security-spring-boot-starter</artifactId>
-    <name>common-security-spring-boot-starter</name>
+    <name>Common Security Spring Boot Starter</name>
     <description>Common Security Spring Boot Starter</description>
 
     <dependencies>

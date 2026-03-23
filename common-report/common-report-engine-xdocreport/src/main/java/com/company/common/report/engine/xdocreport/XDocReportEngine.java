@@ -50,8 +50,6 @@ public class XDocReportEngine implements ReportEngine {
 
     private static final Logger log = LoggerFactory.getLogger(XDocReportEngine.class);
 
-    private static final long MAX_FILE_SIZE = 50L * 1024 * 1024;
-
     private static final Set<OutputFormat> SUPPORTED_FORMATS = Set.of(
             OutputFormat.DOCX, OutputFormat.PDF, OutputFormat.ODT
     );

@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>common-security-auth-otp</artifactId>
-    <name>common-security-auth-otp</name>
+    <name>Common Security Auth OTP</name>
     <description>TOTP / OTP Two-Factor Authentication</description>
 
     <dependencies>

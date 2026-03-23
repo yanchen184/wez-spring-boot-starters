@@ -13,6 +13,11 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
+/**
+ * 電子簽名板模組自動配置
+ *
+ * <p>註冊 {@link SignatureService} 和 {@link SignatureController}，依賴 {@link AttachmentService}。
+ */
 @AutoConfiguration
 @EnableConfigurationProperties(SignatureProperties.class)
 @ConditionalOnProperty(prefix = "common.signature", name = "enabled", matchIfMissing = true)
