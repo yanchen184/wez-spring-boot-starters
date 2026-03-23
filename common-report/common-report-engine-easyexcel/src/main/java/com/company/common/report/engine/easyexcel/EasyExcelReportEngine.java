@@ -26,8 +26,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Set;
@@ -46,6 +48,8 @@ import java.util.Set;
 public class EasyExcelReportEngine implements ReportEngine {
 
     private static final Logger log = LoggerFactory.getLogger(EasyExcelReportEngine.class);
+
+    private static final long MAX_FILE_SIZE = 50L * 1024 * 1024;
 
     private static final Set<OutputFormat> SUPPORTED_FORMATS = Set.of(
             OutputFormat.XLSX, OutputFormat.XLS, OutputFormat.CSV
@@ -69,32 +73,17 @@ public class EasyExcelReportEngine implements ReportEngine {
                 context.getSheets() != null ? context.getSheets().size() : 0,
                 context.getPivots() != null ? context.getPivots().size() : 0);
 
+        boolean hasPivot = context.getPivots() != null && !context.getPivots().isEmpty()
+                && context.getOutputFormat() == OutputFormat.XLSX;
+
+        // 有 Pivot 時全程用 temp file，避免 byte[] 重複拷貝
+        if (hasPivot) {
+            return generateWithPivot(context);
+        }
+
+        // 無 Pivot — 直接寫到記憶體
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ExcelTypeEnum excelType = toExcelType(context.getOutputFormat());
-
-        if (context.getSheets() != null && !context.getSheets().isEmpty()) {
-            generateMultiSheet(context.getSheets(), out, excelType);
-        } else if (context.getTemplatePath() != null && !context.getTemplatePath().isBlank()) {
-            generateWithTemplate(context, out, excelType);
-        } else if (context.getData() != null && !context.getData().isEmpty()) {
-            generateWithData(context, out, excelType);
-        } else {
-            throw new IllegalArgumentException(
-                    "Either sheets, templatePath, or data must be provided for EasyExcel engine");
-        }
-
-        // Pivot Table 後處理
-        if (context.getPivots() != null && !context.getPivots().isEmpty()
-                && context.getOutputFormat() == OutputFormat.XLSX) {
-            byte[] withPivot = addPivotTables(out.toByteArray(), context.getPivots());
-            out.reset();
-            try {
-                out.write(withPivot);
-            } catch (IOException e) {
-                throw new IllegalStateException("Failed to write pivot table result", e);
-            }
-        }
-
+        writeExcelContent(context, out);
         validateFileSize(out);
 
         String fileName = resolveFileName(context);
@@ -102,6 +91,53 @@ public class EasyExcelReportEngine implements ReportEngine {
 
         log.info("<-- EasyExcel generate | fileName={}, size={} bytes", fileName, out.size());
         return new ReportResult(out.toByteArray(), contentType, fileName);
+    }
+
+    /**
+     * 有 Pivot Table 時的產製流程：全程使用 temp file。
+     *
+     * <p>流程：EasyExcel → temp file → OPCPackage.open(File) → 加 Pivot → 寫回 temp file → readAllBytes
+     * <p>整個過程只有最後 readAllBytes 一次 byte[] 拷貝，不會有中間的重複拷貝。
+     */
+    private ReportResult generateWithPivot(ReportContext context) {
+        File tempFile = null;
+        try {
+            tempFile = File.createTempFile("report-pivot-", ".xlsx");
+
+            // Step 1: EasyExcel 直接寫到 temp file
+            try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                writeExcelContent(context, fos);
+            }
+
+            // Step 2: 用 OPCPackage.open(File) 開啟（memory-mapped IO），加入 Pivot Table
+            try (OPCPackage pkg = OPCPackage.open(tempFile);
+                 XSSFWorkbook workbook = new XSSFWorkbook(pkg)) {
+                for (PivotConfig pivot : context.getPivots()) {
+                    addPivotTable(workbook, pivot);
+                }
+                // 寫回同一個 temp file
+                try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                    workbook.write(fos);
+                }
+            }
+
+            // Step 3: 讀取最終結果（唯一一次 byte[] 拷貝）
+            byte[] content = Files.readAllBytes(tempFile.toPath());
+            validateFileSize(content);
+
+            String fileName = resolveFileName(context);
+            String contentType = resolveContentType(context.getOutputFormat());
+
+            log.info("<-- EasyExcel generate (pivot) | fileName={}, size={} bytes", fileName, content.length);
+            return new ReportResult(content, contentType, fileName);
+
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to generate report with pivot table", e);
+        } finally {
+            if (tempFile != null && tempFile.exists()) {
+                tempFile.delete();
+            }
+        }
     }
 
     @Override
@@ -145,41 +181,28 @@ public class EasyExcelReportEngine implements ReportEngine {
         return new ReportResult(out.toByteArray(), contentType, fileName);
     }
 
-    // ==================== Pivot Table 後處理 ====================
+    // ==================== 共用寫入邏輯 ====================
 
     /**
-     * 透過 temp file + OPCPackage.open(File) 加入 Pivot Table。
-     *
-     * <p>使用 temp file 而非 ByteArrayInputStream，有兩個好處：
-     * <ol>
-     *   <li>傳入的 excelBytes 可以提早設為 null 讓 GC 回收（省 ~50MB）</li>
-     *   <li>OPCPackage.open(File) 使用 memory-mapped IO，比 InputStream 省 30-40% 記憶體</li>
-     * </ol>
+     * 根據 context 的內容，將 Excel 寫入指定的 OutputStream。
+     * 支援多 Sheet、範本填充、資料寫入三種模式。
      */
-    private byte[] addPivotTables(byte[] excelBytes, List<PivotConfig> pivots) {
-        File tempFile = null;
-        try {
-            tempFile = File.createTempFile("report-pivot-", ".xlsx");
-            Files.write(tempFile.toPath(), excelBytes);
-            excelBytes = null; // 釋放 byte[] 讓 GC 回收
+    private void writeExcelContent(ReportContext context, OutputStream out) {
+        ExcelTypeEnum excelType = toExcelType(context.getOutputFormat());
 
-            try (OPCPackage pkg = OPCPackage.open(tempFile);
-                 XSSFWorkbook workbook = new XSSFWorkbook(pkg)) {
-                for (PivotConfig pivot : pivots) {
-                    addPivotTable(workbook, pivot);
-                }
-                ByteArrayOutputStream result = new ByteArrayOutputStream();
-                workbook.write(result);
-                return result.toByteArray();
-            }
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to add pivot table", e);
-        } finally {
-            if (tempFile != null && tempFile.exists()) {
-                tempFile.delete();
-            }
+        if (context.getSheets() != null && !context.getSheets().isEmpty()) {
+            generateMultiSheet(context.getSheets(), out, excelType);
+        } else if (context.getTemplatePath() != null && !context.getTemplatePath().isBlank()) {
+            generateWithTemplate(context, out, excelType);
+        } else if (context.getData() != null && !context.getData().isEmpty()) {
+            generateWithData(context, out, excelType);
+        } else {
+            throw new IllegalArgumentException(
+                    "Either sheets, templatePath, or data must be provided for EasyExcel engine");
         }
     }
+
+    // ==================== Pivot Table ====================
 
     private void addPivotTable(XSSFWorkbook workbook, PivotConfig pivot) {
         XSSFSheet sourceSheet = workbook.getSheet(pivot.getSourceSheet());
@@ -270,7 +293,7 @@ public class EasyExcelReportEngine implements ReportEngine {
     // ==================== 多 Sheet 模式 ====================
 
     private void generateMultiSheet(List<SheetData> sheets,
-                                    ByteArrayOutputStream out,
+                                    OutputStream out,
                                     ExcelTypeEnum excelType) {
         try (ExcelWriter writer = EasyExcel.write(out).excelType(excelType).build()) {
             for (int i = 0; i < sheets.size(); i++) {
@@ -289,7 +312,7 @@ public class EasyExcelReportEngine implements ReportEngine {
     // ==================== 範本填充模式 ====================
 
     private void generateWithTemplate(ReportContext context,
-                                      ByteArrayOutputStream out,
+                                      OutputStream out,
                                       ExcelTypeEnum excelType) {
         InputStream templateStream = getClass().getClassLoader()
                 .getResourceAsStream(context.getTemplatePath());
@@ -324,7 +347,7 @@ public class EasyExcelReportEngine implements ReportEngine {
     // ==================== 資料寫入模式 ====================
 
     private void generateWithData(ReportContext context,
-                                  ByteArrayOutputStream out,
+                                  OutputStream out,
                                   ExcelTypeEnum excelType) {
         if (context.getData() == null || context.getData().isEmpty()) {
             throw new IllegalArgumentException("Data list cannot be empty for data-driven report");
@@ -341,6 +364,12 @@ public class EasyExcelReportEngine implements ReportEngine {
 
     private void validateFileSize(ByteArrayOutputStream out) {
         if (out.size() > MAX_FILE_SIZE) {
+            throw new IllegalStateException("Report file exceeds maximum allowed size: 50MB");
+        }
+    }
+
+    private void validateFileSize(byte[] content) {
+        if (content.length > MAX_FILE_SIZE) {
             throw new IllegalStateException("Report file exceeds maximum allowed size: 50MB");
         }
     }
