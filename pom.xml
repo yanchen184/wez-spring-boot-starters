@@ -27,6 +27,8 @@
         <module>common-report</module>
         <!-- 通知模組 -->
         <module>common-notification-spring-boot-starter</module>
+        <!-- API Hub 閘道 -->
+        <module>common-api-hub-spring-boot-starter</module>
         <!-- 業務級 Starter -->
         <module>business/common-signature-spring-boot-starter</module>
     </modules>
