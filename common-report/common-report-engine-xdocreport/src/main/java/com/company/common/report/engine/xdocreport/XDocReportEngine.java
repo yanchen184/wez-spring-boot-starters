@@ -27,8 +27,6 @@ import org.apache.poi.xwpf.usermodel.XWPFRun;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
@@ -243,21 +241,6 @@ public class XDocReportEngine implements ReportEngine {
         return false;
     }
 
-    private boolean isImageTarget(XWPFParagraph para, Map<String, ImageSource> images) {
-        String text = para.getText();
-        if (text == null) {
-            return false;
-        }
-        String trimmed = text.trim();
-        // 找 $fieldName 書籤（context.getImages() 的 key）
-        for (String key : images.keySet()) {
-            if (trimmed.equals("$" + key)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     @Override
     public ReportResult generateMerged(List<ReportContext> contexts) {
         if (contexts.size() == 1) {
@@ -407,19 +390,13 @@ public class XDocReportEngine implements ReportEngine {
     }
 
     private InputStream loadTemplate(String templatePath) {
-        // 先嘗試從 classpath 載入
         InputStream stream = getClass().getClassLoader()
                 .getResourceAsStream(templatePath);
-        if (stream != null) {
-            return stream;
-        }
-        // 嘗試從 file system 載入
-        try {
-            return new FileInputStream(templatePath);
-        } catch (FileNotFoundException e) {
+        if (stream == null) {
             throw new IllegalArgumentException(
-                    "Template not found: " + templatePath, e);
+                    "Template not found on classpath: " + templatePath);
         }
+        return stream;
     }
 
     private String resolveFileName(ReportContext context) {

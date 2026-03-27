@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -64,23 +63,6 @@ public class ReportLogService {
         }
         logRepo.save(reportLog);
         log.info("--> updateStatus | uuid={}, status={}", uuid, status);
-    }
-
-    /**
-     * 儲存產製結果（檔案內容）
-     */
-    @Transactional
-    public void saveResult(String uuid, byte[] content, String contentType) {
-        ReportLog reportLog = logRepo.findByUuid(uuid)
-                .orElseThrow(() -> new IllegalArgumentException("ReportLog not found: " + uuid));
-        reportLog.setContentType(contentType);
-
-        ReportLogBlob blob = new ReportLogBlob();
-        blob.setReportLog(reportLog);
-        blob.setFileBlob(content);
-        blobRepo.save(blob);
-
-        log.info("--> saveResult | uuid={}, size={} bytes", uuid, content.length);
     }
 
     /**
@@ -143,17 +125,4 @@ public class ReportLogService {
         }
     }
 
-    /**
-     * 清除超過指定天數的已完成記錄
-     */
-    @Transactional
-    public void cleanupOlderThan(int days) {
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(days);
-        // 先刪 blob 再刪 log（外鍵約束）
-        for (ReportStatus status : List.of(ReportStatus.COMPLETED, ReportStatus.FAILED)) {
-            logRepo.deleteBlobsByCreatedDateBeforeAndStatus(cutoff, status);
-            logRepo.deleteLogsByCreatedDateBeforeAndStatus(cutoff, status);
-        }
-        log.info("--> cleanupOlderThan | days={}, cutoff={}", days, cutoff);
-    }
 }

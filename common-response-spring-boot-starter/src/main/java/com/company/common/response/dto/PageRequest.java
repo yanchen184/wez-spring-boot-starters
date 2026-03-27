@@ -1,5 +1,7 @@
 package com.company.common.response.dto;
 
+import java.util.regex.Pattern;
+
 /**
  * 通用分頁查詢參數
  *
@@ -25,6 +27,7 @@ public class PageRequest {
     public static final int DEFAULT_PAGE = 0;
     public static final int DEFAULT_SIZE = 20;
     public static final int MAX_SIZE = 100;
+    private static final Pattern SORT_BY_PATTERN = Pattern.compile("^[a-zA-Z][a-zA-Z0-9_.]{0,63}$");
 
     private int page = DEFAULT_PAGE;
     private int size = DEFAULT_SIZE;
@@ -55,6 +58,9 @@ public class PageRequest {
     }
 
     public void setSortBy(String sortBy) {
+        if (sortBy != null && !SORT_BY_PATTERN.matcher(sortBy).matches()) {
+            throw new IllegalArgumentException("Invalid sortBy format: " + sortBy);
+        }
         this.sortBy = sortBy;
     }
 

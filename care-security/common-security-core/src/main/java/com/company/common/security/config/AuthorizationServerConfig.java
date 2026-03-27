@@ -18,14 +18,19 @@ import org.springframework.security.oauth2.server.authorization.settings.TokenSe
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 
+import com.company.common.security.autoconfigure.CareSecurityProperties;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -35,15 +40,19 @@ public class AuthorizationServerConfig {
 
     private static final Logger log = LoggerFactory.getLogger(AuthorizationServerConfig.class);
 
-    public RegisteredClientRepository registeredClientRepository() {
+    public RegisteredClientRepository registeredClientRepository(CareSecurityProperties properties) {
+        CareSecurityProperties.OAuth2Client oauth2 = properties.getOauth2Client();
+        Objects.requireNonNull(oauth2.getClientSecret(),
+                "care.security.oauth2-client.client-secret must be configured");
+
         RegisteredClient webClient = RegisteredClient.withId(UUID.randomUUID().toString())
-                .clientId("care-web-client")
-                .clientSecret("{bcrypt}$2b$12$placeholder")
+                .clientId(oauth2.getClientId())
+                .clientSecret(oauth2.getClientSecret())
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
-                .redirectUri("http://localhost:3000/callback")
+                .redirectUri(oauth2.getRedirectUri())
                 .scope("read")
                 .scope("write")
                 .tokenSettings(TokenSettings.builder()
@@ -78,10 +87,6 @@ public class AuthorizationServerConfig {
         return new ImmutableJWKSet<>(jwkSet);
     }
 
-    public JWKSource<SecurityContext> jwkSource() {
-        return jwkSource(null);
-    }
-
     private RSAKey loadOrCreate(Path path) {
         if (Files.exists(path)) {
             return loadFromFile(path);
@@ -110,6 +115,12 @@ public class AuthorizationServerConfig {
 
             Files.createDirectories(path.getParent());
             Files.writeString(path, json, StandardCharsets.UTF_8);
+            try {
+                Files.setPosixFilePermissions(path, Set.of(
+                        PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
+            } catch (UnsupportedOperationException ignored) {
+                // Windows — no POSIX permissions
+            }
             log.info("Generated and saved RSA key to: {}", path);
             return rsaKey;
         } catch (Exception ex) {

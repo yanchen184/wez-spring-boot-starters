@@ -70,8 +70,12 @@ public class NotificationScheduler {
         }
         log.info("Retrying {} failed notifications (max retry: {})", retryable.size(), maxRetry);
         for (NotificationLog entry : retryable) {
+            int claimed = logRepository.updateStatusIfMatch(
+                    entry.getId(), NotificationStatus.FAILED, NotificationStatus.PENDING);
+            if (claimed == 0) {
+                continue; // another instance already claimed it
+            }
             entry.setStatus(NotificationStatus.PENDING);
-            logRepository.save(entry);
             notificationService.deliver(entry);
         }
     }

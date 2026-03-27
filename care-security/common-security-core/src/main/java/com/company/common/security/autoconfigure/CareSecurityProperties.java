@@ -17,6 +17,7 @@ public class CareSecurityProperties {
     private Captcha captcha = new Captcha();
     private CitizenCert citizenCert = new CitizenCert();
     private Web web = new Web();
+    private OAuth2Client oauth2Client = new OAuth2Client();
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -38,6 +39,8 @@ public class CareSecurityProperties {
     public void setCitizenCert(CitizenCert citizenCert) { this.citizenCert = citizenCert; }
     public Web getWeb() { return web; }
     public void setWeb(Web web) { this.web = web; }
+    public OAuth2Client getOauth2Client() { return oauth2Client; }
+    public void setOauth2Client(OAuth2Client oauth2Client) { this.oauth2Client = oauth2Client; }
 
     public static class Jwt {
         private int accessTokenTtlMinutes = 30;
@@ -157,6 +160,20 @@ public class CareSecurityProperties {
         public void setFontSize(int fontSize) { this.fontSize = fontSize; }
         public boolean isAudioEnabled() { return audioEnabled; }
         public void setAudioEnabled(boolean audioEnabled) { this.audioEnabled = audioEnabled; }
+    }
+
+    public static class OAuth2Client {
+        private String clientId = "care-web-client";
+        /** Must be configured — no default. Format: {bcrypt}$2b$... */
+        private String clientSecret;
+        private String redirectUri = "http://localhost:3000/callback";
+
+        public String getClientId() { return clientId; }
+        public void setClientId(String clientId) { this.clientId = clientId; }
+        public String getClientSecret() { return clientSecret; }
+        public void setClientSecret(String clientSecret) { this.clientSecret = clientSecret; }
+        public String getRedirectUri() { return redirectUri; }
+        public void setRedirectUri(String redirectUri) { this.redirectUri = redirectUri; }
     }
 
     public static class Web {

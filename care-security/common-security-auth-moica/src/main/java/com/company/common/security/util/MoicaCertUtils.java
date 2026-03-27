@@ -70,16 +70,16 @@ public class MoicaCertUtils {
      */
     private static final String MOICA_IDNO_OID = "2.16.886.1.100.1.1";
 
-    private static final int OCSP_CONNECT_TIMEOUT_MS = 5000;
-    private static final int OCSP_READ_TIMEOUT_MS = 10000;
-    private static final int CRL_CONNECT_TIMEOUT_MS = 5000;
-    private static final int CRL_READ_TIMEOUT_MS = 15000;
-
     private final X509Certificate certificate;
     private final List<X509Certificate> intermediateCerts;
     private final List<String> localCrlPaths;
     private final boolean ocspEnabled;
     private final boolean crlEnabled;
+    private final int ocspConnectTimeoutMs;
+    private final int ocspReadTimeoutMs;
+    private final int crlConnectTimeoutMs;
+    private final int crlReadTimeoutMs;
+    private final long crlCacheTtlMs;
 
     // In-memory CRL cache: path or URL -> CachedCrl (shared for both local files and network downloads)
     private static final Map<String, CachedCrl> crlCache = new ConcurrentHashMap<>();
@@ -100,11 +100,24 @@ public class MoicaCertUtils {
      */
     public MoicaCertUtils(X509Certificate certificate, List<X509Certificate> intermediateCerts,
                           List<String> localCrlPaths, boolean ocspEnabled, boolean crlEnabled) {
+        this(certificate, intermediateCerts, localCrlPaths, ocspEnabled, crlEnabled,
+                5000, 10000, 5000, 15000, 3600_000L);
+    }
+
+    public MoicaCertUtils(X509Certificate certificate, List<X509Certificate> intermediateCerts,
+                          List<String> localCrlPaths, boolean ocspEnabled, boolean crlEnabled,
+                          int ocspConnectTimeoutMs, int ocspReadTimeoutMs,
+                          int crlConnectTimeoutMs, int crlReadTimeoutMs, long crlCacheTtlMs) {
         this.certificate = certificate;
         this.intermediateCerts = intermediateCerts != null ? intermediateCerts : List.of();
         this.localCrlPaths = localCrlPaths != null ? localCrlPaths : List.of();
         this.ocspEnabled = ocspEnabled;
         this.crlEnabled = crlEnabled;
+        this.ocspConnectTimeoutMs = ocspConnectTimeoutMs;
+        this.ocspReadTimeoutMs = ocspReadTimeoutMs;
+        this.crlConnectTimeoutMs = crlConnectTimeoutMs;
+        this.crlReadTimeoutMs = crlReadTimeoutMs;
+        this.crlCacheTtlMs = crlCacheTtlMs;
     }
 
     /**
@@ -248,10 +261,10 @@ public class MoicaCertUtils {
                 // Return last 4 characters
                 if (idValue != null && idValue.length() >= 4) {
                     String last4 = idValue.substring(idValue.length() - 4);
-                    log.debug("Extracted last4IDNO: {}", last4);
+                    log.debug("Extracted last4IDNO: ****");
                     return last4;
                 }
-                log.warn("ID extension value too short: {}", idValue);
+                log.warn("ID extension value too short (length={})", idValue != null ? idValue.length() : 0);
                 return idValue;
             }
         } catch (Exception e) {
@@ -320,8 +333,8 @@ public class MoicaCertUtils {
             conn.setRequestProperty("Content-Type", "application/ocsp-request");
             conn.setRequestProperty("Accept", "application/ocsp-response");
             conn.setDoOutput(true);
-            conn.setConnectTimeout(OCSP_CONNECT_TIMEOUT_MS);
-            conn.setReadTimeout(OCSP_READ_TIMEOUT_MS);
+            conn.setConnectTimeout(ocspConnectTimeoutMs);
+            conn.setReadTimeout(ocspReadTimeoutMs);
 
             try (var os = conn.getOutputStream()) {
                 os.write(ocspReqBytes);
@@ -468,7 +481,8 @@ public class MoicaCertUtils {
         try (InputStream is = openCrlPath(crlPath)) {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             X509CRL crl = (X509CRL) cf.generateCRL(is);
-            crlCache.put(crlPath, new CachedCrl(crl, System.currentTimeMillis()));
+            evictExpiredCrlEntries();
+            crlCache.put(crlPath, new CachedCrl(crl, System.currentTimeMillis(), crlCacheTtlMs));
             log.info("Local CRL loaded: path={}, issuer={}, thisUpdate={}, nextUpdate={}",
                     crlPath, crl.getIssuerX500Principal(), crl.getThisUpdate(), crl.getNextUpdate());
             return crl;
@@ -537,8 +551,8 @@ public class MoicaCertUtils {
         log.debug("Downloading CRL from: {}", crlUrl);
         HttpURLConnection conn = (HttpURLConnection) URI.create(crlUrl).toURL().openConnection();
         try {
-            conn.setConnectTimeout(CRL_CONNECT_TIMEOUT_MS);
-            conn.setReadTimeout(CRL_READ_TIMEOUT_MS);
+            conn.setConnectTimeout(crlConnectTimeoutMs);
+            conn.setReadTimeout(crlReadTimeoutMs);
             conn.setRequestMethod("GET");
 
             if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
@@ -550,7 +564,8 @@ public class MoicaCertUtils {
                 X509CRL crl = (X509CRL) cf.generateCRL(is);
 
                 // Cache with default 1-hour TTL
-                crlCache.put(crlUrl, new CachedCrl(crl, System.currentTimeMillis()));
+                evictExpiredCrlEntries();
+                crlCache.put(crlUrl, new CachedCrl(crl, System.currentTimeMillis(), crlCacheTtlMs));
                 log.debug("CRL downloaded and cached: {} (next update: {})", crlUrl, crl.getNextUpdate());
                 return crl;
             }
@@ -575,20 +590,15 @@ public class MoicaCertUtils {
         crlCache.clear();
     }
 
-    /**
-     * Set the CRL cache TTL in hours. The default is 1 hour.
-     */
-    public static void setCrlCacheTtlHours(int hours) {
-        CachedCrl.cacheTtlMs = hours * 3600L * 1000L;
+    private static void evictExpiredCrlEntries() {
+        crlCache.entrySet().removeIf(e -> e.getValue().isExpired());
     }
 
     // ========== Inner classes ==========
 
-    private record CachedCrl(X509CRL crl, long cachedAtMs) {
-        static volatile long cacheTtlMs = 3600_000L; // default 1 hour
-
+    private record CachedCrl(X509CRL crl, long cachedAtMs, long ttlMs) {
         boolean isExpired() {
-            return System.currentTimeMillis() - cachedAtMs > cacheTtlMs;
+            return System.currentTimeMillis() - cachedAtMs > ttlMs;
         }
     }
 }

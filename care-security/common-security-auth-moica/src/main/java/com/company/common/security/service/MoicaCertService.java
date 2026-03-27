@@ -26,15 +26,26 @@ public class MoicaCertService {
     private final List<String> localCrlPaths;
     private final boolean ocspEnabled;
     private final boolean crlEnabled;
+    private final int ocspConnectTimeoutMs;
+    private final int ocspReadTimeoutMs;
+    private final int crlConnectTimeoutMs;
+    private final int crlReadTimeoutMs;
+    private final long crlCacheTtlMs;
 
     public MoicaCertService(ResourceLoader resourceLoader, List<String> intermediateCertPaths,
                             List<String> localCrlPaths,
-                            boolean ocspEnabled, boolean crlEnabled, int crlCacheTtlHours) {
+                            boolean ocspEnabled, boolean crlEnabled, int crlCacheTtlHours,
+                            int ocspConnectTimeoutMs, int ocspReadTimeoutMs,
+                            int crlConnectTimeoutMs, int crlReadTimeoutMs) {
         this.ocspEnabled = ocspEnabled;
         this.crlEnabled = crlEnabled;
         this.intermediateCerts = loadCertificates(resourceLoader, intermediateCertPaths);
         this.localCrlPaths = localCrlPaths != null ? localCrlPaths : List.of();
-        MoicaCertUtils.setCrlCacheTtlHours(crlCacheTtlHours);
+        this.ocspConnectTimeoutMs = ocspConnectTimeoutMs;
+        this.ocspReadTimeoutMs = ocspReadTimeoutMs;
+        this.crlConnectTimeoutMs = crlConnectTimeoutMs;
+        this.crlReadTimeoutMs = crlReadTimeoutMs;
+        this.crlCacheTtlMs = crlCacheTtlHours * 3600L * 1000L;
         log.info("MoicaCertService initialized: {} intermediate CAs, {} local CRL paths, OCSP={}, CRL={}",
                 intermediateCerts.size(), this.localCrlPaths.size(), ocspEnabled, crlEnabled);
     }
@@ -44,7 +55,8 @@ public class MoicaCertService {
      * Local CRL paths are passed as-is; MoicaCertUtils will read and cache them with TTL.
      */
     public MoicaCertUtils createVerifier(X509Certificate certificate) {
-        return new MoicaCertUtils(certificate, intermediateCerts, localCrlPaths, ocspEnabled, crlEnabled);
+        return new MoicaCertUtils(certificate, intermediateCerts, localCrlPaths, ocspEnabled, crlEnabled,
+                ocspConnectTimeoutMs, ocspReadTimeoutMs, crlConnectTimeoutMs, crlReadTimeoutMs, crlCacheTtlMs);
     }
 
     /**

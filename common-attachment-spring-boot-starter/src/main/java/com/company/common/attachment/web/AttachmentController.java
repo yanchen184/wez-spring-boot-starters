@@ -31,6 +31,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AttachmentController {
 
+    private static final java.util.regex.Pattern OWNER_TYPE_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Z][A-Z0-9_]{0,49}$");
+
     private final AttachmentService attachmentService;
 
     @PostMapping
@@ -40,6 +43,9 @@ public class AttachmentController {
             @RequestParam("ownerId") Long ownerId,
             @RequestParam(value = "displayName", required = false) String displayName
     ) throws IOException {
+        if (!OWNER_TYPE_PATTERN.matcher(ownerType).matches()) {
+            return ResponseEntity.badRequest().build();
+        }
         AttachmentUploadRequest request = new AttachmentUploadRequest(
                 ownerType,
                 ownerId,

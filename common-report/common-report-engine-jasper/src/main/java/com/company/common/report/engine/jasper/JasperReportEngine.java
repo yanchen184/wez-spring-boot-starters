@@ -25,8 +25,6 @@ import org.slf4j.LoggerFactory;
 import net.sf.jasperreports.engine.DefaultJasperReportsContext;
 
 import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
@@ -172,17 +170,11 @@ public class JasperReportEngine implements ReportEngine {
     }
 
     private InputStream loadTemplate(String templatePath) {
-        // 先嘗試 classpath
         InputStream stream = getClass().getClassLoader().getResourceAsStream(templatePath);
-        if (stream != null) {
-            return stream;
+        if (stream == null) {
+            throw new IllegalArgumentException("Template not found on classpath: " + templatePath);
         }
-        // 嘗試 filesystem
-        try {
-            return new FileInputStream(templatePath);
-        } catch (FileNotFoundException e) {
-            throw new IllegalArgumentException("Template not found: " + templatePath, e);
-        }
+        return stream;
     }
 
     private byte[] export(JasperPrint print, OutputFormat format) throws JRException {

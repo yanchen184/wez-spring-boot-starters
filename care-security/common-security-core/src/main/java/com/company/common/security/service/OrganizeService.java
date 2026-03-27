@@ -82,21 +82,5 @@ public class OrganizeService {
 
     /**
      * @deprecated Use toTreeResponseFromMemory() with pre-loaded children to avoid N+1 queries.
-     * This method triggers lazy loading of children.
      */
-    @Deprecated
-    private OrganizeTreeResponse toTreeResponse(Organize org) {
-        List<OrganizeTreeResponse> children = org.getChildren().stream()
-                .filter(child -> Boolean.TRUE.equals(child.getEnabled()))
-                .map(this::toTreeResponse)
-                .toList();
-
-        return new OrganizeTreeResponse(
-                org.getObjid(),
-                org.getOrgName(),
-                org.getOrgCode(),
-                org.getSortOrder(),
-                children
-        );
-    }
 }

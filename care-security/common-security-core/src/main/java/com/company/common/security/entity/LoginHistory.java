@@ -28,9 +28,6 @@ public class LoginHistory {
     @Column(name = "IS_SUCCESS")
     private Boolean success;
 
-    @Column(name = "IS_LOCKED")
-    private Boolean locked;
-
     @Column(name = "LOGIN_DATETIME")
     private LocalDateTime loginTime;
 
@@ -54,8 +51,6 @@ public class LoginHistory {
     public void setIpAddress(String ipAddress) { this.ipAddress = ipAddress; }
     public Boolean getSuccess() { return success; }
     public void setSuccess(Boolean success) { this.success = success; }
-    public Boolean getLocked() { return locked; }
-    public void setLocked(Boolean locked) { this.locked = locked; }
     public String getFailReason() { return failReason; }
     public void setFailReason(String failReason) { this.failReason = failReason; }
 }

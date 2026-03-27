@@ -292,8 +292,10 @@ public class CareSecurityAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
-        public RegisteredClientRepository registeredClientRepository(AuthorizationServerConfig authorizationServerConfig) {
-            return authorizationServerConfig.registeredClientRepository();
+        public RegisteredClientRepository registeredClientRepository(
+                AuthorizationServerConfig authorizationServerConfig,
+                CareSecurityProperties properties) {
+            return authorizationServerConfig.registeredClientRepository(properties);
         }
 
         @Bean

@@ -132,10 +132,11 @@ public class ReportController {
                 : MediaType.APPLICATION_OCTET_STREAM_VALUE;
 
         String encodedFileName = java.net.URLEncoder.encode(
-                reportLog.getFileName(), StandardCharsets.UTF_8);
+                reportLog.getFileName(), StandardCharsets.UTF_8).replace("+", "%20");
+        String asciiFileName = reportLog.getFileName().replaceAll("[^\\x20-\\x7E]", "_");
         response.setContentType(contentType);
         response.setHeader("Content-Disposition",
-                "attachment; filename=\"" + encodedFileName + "\"");
+                "attachment; filename=\"" + asciiFileName + "\"; filename*=UTF-8''" + encodedFileName);
         response.setContentLength(content.length);
         try (var outputStream = response.getOutputStream()) {
             outputStream.write(content);

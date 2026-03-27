@@ -43,7 +43,7 @@ public class AuthController {
     public TokenResponse login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
-        String ipAddress = getClientIp(httpRequest);
+        String ipAddress = com.company.common.security.util.IpUtils.getClientIp(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
         return authService.login(request, ipAddress, userAgent);
     }
@@ -90,7 +90,7 @@ public class AuthController {
             @Valid @RequestBody SwitchUserRequest request,
             Authentication authentication,
             HttpServletRequest httpRequest) {
-        String ipAddress = getClientIp(httpRequest);
+        String ipAddress = com.company.common.security.util.IpUtils.getClientIp(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
         return authService.switchUser(
                 authentication.getName(), request.username(), request.orgId(), ipAddress, userAgent);
@@ -107,18 +107,11 @@ public class AuthController {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error("Not currently impersonating any user"));
         }
-        String ipAddress = getClientIp(httpRequest);
+        String ipAddress = com.company.common.security.util.IpUtils.getClientIp(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
         String currentUser = authentication.getName();
         TokenResponse token = authService.exitSwitchUser(impersonatedBy, currentUser, ipAddress, userAgent);
         return ResponseEntity.ok(ApiResponse.ok(token));
     }
 
-    private String getClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
-    }
 }

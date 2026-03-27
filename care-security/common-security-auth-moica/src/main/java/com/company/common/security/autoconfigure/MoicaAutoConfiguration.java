@@ -63,7 +63,11 @@ public class MoicaAutoConfiguration {
                 certProps.getLocalCrlPaths(),
                 certProps.isOcspEnabled(),
                 certProps.isCrlEnabled(),
-                certProps.getCrlCacheTtlHours());
+                certProps.getCrlCacheTtlHours(),
+                certProps.getOcspConnectTimeoutMs(),
+                certProps.getOcspReadTimeoutMs(),
+                certProps.getCrlConnectTimeoutMs(),
+                certProps.getCrlReadTimeoutMs());
     }
 
     @Bean

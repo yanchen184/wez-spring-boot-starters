@@ -189,12 +189,14 @@ class Phase3_ReportLogServiceTest {
     class SaveResult {
 
         @Test
-        @DisplayName("saves file blob and retrieves it")
+        @DisplayName("saves file blob via completeReport and retrieves it")
         void saveAndGetBlob() {
             String uuid = logService.createLog("report", "r.xlsx");
             byte[] content = "Excel file content".getBytes();
 
-            logService.saveResult(uuid, content,
+            // Transition PENDING → PROCESSING → COMPLETED
+            logService.updateStatus(uuid, ReportStatus.PROCESSING, null);
+            logService.completeReport(uuid, content,
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
             Optional<byte[]> blob = logService.getBlob(uuid);

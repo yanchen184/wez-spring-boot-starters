@@ -56,9 +56,11 @@ public class UserService {
         this.saUserFactory = saUserFactory;
     }
 
+    @Deprecated(forRemoval = true)
     @Transactional(readOnly = true)
     public List<UserResponse> findAll() {
         return saUserRepository.findAllWithRoles().stream()
+                .limit(1000)
                 .map(this::toResponse)
                 .toList();
     }

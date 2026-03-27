@@ -63,6 +63,13 @@ class Phase12_CaptchaTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @Autowired CaptchaService captchaService;
+    @Autowired RedisTemplate<String, Object> redisTemplate;
+
+    /** Read captcha answer directly from Redis (test-only replacement for removed getAnswerForTest). */
+    private String getCaptchaAnswer(String captchaId) {
+        Object stored = redisTemplate.opsForValue().get("captcha:" + captchaId);
+        return stored != null ? stored.toString() : null;
+    }
 
     // ========================================================================
     // 12.1 CAPTCHA Generation
@@ -137,7 +144,7 @@ class Phase12_CaptchaTest {
         void verify_correctAnswer_passes() {
             CaptchaService.CaptchaResult result = captchaService.generateCaptcha();
             // Use internal method to get the answer for testing
-            String answer = captchaService.getAnswerForTest(result.captchaId());
+            String answer = getCaptchaAnswer(result.captchaId());
 
             assertThat(captchaService.verifyCaptcha(result.captchaId(), answer)).isTrue();
         }
@@ -160,7 +167,7 @@ class Phase12_CaptchaTest {
         @DisplayName("captcha is single-use — second verification fails")
         void verify_singleUse() {
             CaptchaService.CaptchaResult result = captchaService.generateCaptcha();
-            String answer = captchaService.getAnswerForTest(result.captchaId());
+            String answer = getCaptchaAnswer(result.captchaId());
 
             assertThat(captchaService.verifyCaptcha(result.captchaId(), answer)).isTrue();
             // Second attempt with same id should fail
@@ -219,7 +226,7 @@ class Phase12_CaptchaTest {
         @DisplayName("login with correct captcha + wrong password returns 401")
         void login_correctCaptcha_wrongPassword_returns401() throws Exception {
             CaptchaService.CaptchaResult captcha = captchaService.generateCaptcha();
-            String answer = captchaService.getAnswerForTest(captcha.captchaId());
+            String answer = getCaptchaAnswer(captcha.captchaId());
 
             String body = String.format("""
                     {"username":"ADMIN","password":"WrongPass","captchaId":"%s","captchaAnswer":"%s"}
@@ -236,7 +243,7 @@ class Phase12_CaptchaTest {
         @DisplayName("login with correct captcha + correct password returns 200")
         void login_correctCaptcha_correctPassword_returns200() throws Exception {
             CaptchaService.CaptchaResult captcha = captchaService.generateCaptcha();
-            String answer = captchaService.getAnswerForTest(captcha.captchaId());
+            String answer = getCaptchaAnswer(captcha.captchaId());
 
             String body = String.format("""
                     {"username":"ADMIN","password":"Admin@123","captchaId":"%s","captchaAnswer":"%s"}
@@ -254,7 +261,7 @@ class Phase12_CaptchaTest {
         @DisplayName("reused captcha id on login returns 400")
         void login_reusedCaptcha_returns400() throws Exception {
             CaptchaService.CaptchaResult captcha = captchaService.generateCaptcha();
-            String answer = captchaService.getAnswerForTest(captcha.captchaId());
+            String answer = getCaptchaAnswer(captcha.captchaId());
 
             // First login succeeds
             String body = String.format("""
@@ -347,7 +354,7 @@ class Phase12_CaptchaTest {
             // 預設字元集是 0-9，產生的 code 應該全是數字
             for (int i = 0; i < 10; i++) {
                 CaptchaService.CaptchaResult result = captchaService.generateCaptcha();
-                String answer = captchaService.getAnswerForTest(result.captchaId());
+                String answer = getCaptchaAnswer(result.captchaId());
                 assertThat(answer).matches("^[0-9]+$");
             }
         }
@@ -367,7 +374,7 @@ class Phase12_CaptchaTest {
 
             CaptchaService alphaService = new CaptchaService(redis, alphaConfig);
             CaptchaService.CaptchaResult result = alphaService.generateCaptcha();
-            String answer = alphaService.getAnswerForTest(result.captchaId());
+            String answer = getCaptchaAnswer(result.captchaId());
 
             // 用全小寫驗證應該也要通過
             assertThat(alphaService.verifyCaptcha(result.captchaId(), answer.toLowerCase())).isTrue();
@@ -498,7 +505,7 @@ class Phase12_CaptchaTest {
 
             CaptchaService audioService = new CaptchaService(redis, audioConfig);
             CaptchaService.CaptchaResult result = audioService.generateCaptcha();
-            String answer = audioService.getAnswerForTest(result.captchaId());
+            String answer = getCaptchaAnswer(result.captchaId());
 
             // 呼叫 audio 後
             String audioBase64 = audioService.generateAudioBase64(result.captchaId());

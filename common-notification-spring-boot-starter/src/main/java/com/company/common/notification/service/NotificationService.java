@@ -12,6 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +43,9 @@ public class NotificationService {
     private final TemplateEngine templateEngine;
     private final Set<String> defaultChannels;
 
+    /** Self-reference for proxy-aware calls (fixes @Transactional self-call bypass). */
+    private NotificationService self;
+
     public NotificationService(NotificationLogRepository logRepository,
                                List<NotificationChannel> channels,
                                TemplateEngine templateEngine,
@@ -51,6 +57,12 @@ public class NotificationService {
         this.defaultChannels = defaultChannels;
         log.info("NotificationService initialized with {} channels: {}, defaults: {}",
                 channelMap.size(), channelMap.keySet(), defaultChannels);
+    }
+
+    @Autowired
+    @Lazy
+    public void setSelf(NotificationService self) {
+        this.self = self;
     }
 
     /**
@@ -65,13 +77,12 @@ public class NotificationService {
         for (Long recipientId : message.getTo()) {
             for (String channelName : channels) {
                 NotificationLog entry = createLogEntry(recipientId, channelName, message, renderedContent);
-                entry.setStatus(NotificationStatus.SENDING);
                 entries.add(entry);
             }
         }
         List<NotificationLog> saved = logRepository.saveAll(entries);
         for (NotificationLog entry : saved) {
-            deliver(entry);
+            self.deliver(entry);
         }
     }
 

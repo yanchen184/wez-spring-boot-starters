@@ -46,4 +46,10 @@ public interface NotificationLogRepository extends JpaRepository<NotificationLog
     @Query("SELECT n.status, COUNT(n) FROM NotificationLog n "
             + "WHERE n.batchId = :batchId GROUP BY n.status")
     List<Object[]> countByBatchIdGroupByStatus(String batchId);
+
+    /** Atomically claim a notification for delivery (prevents double-send). */
+    @Modifying
+    @Query("UPDATE NotificationLog n SET n.status = :newStatus "
+            + "WHERE n.id = :id AND n.status = :expectedStatus")
+    int updateStatusIfMatch(Long id, NotificationStatus expectedStatus, NotificationStatus newStatus);
 }

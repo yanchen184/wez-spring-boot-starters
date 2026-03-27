@@ -135,7 +135,11 @@ public class EasyExcelReportEngine implements ReportEngine {
             throw new IllegalStateException("Failed to generate report with pivot table", e);
         } finally {
             if (tempFile != null && tempFile.exists()) {
-                tempFile.delete();
+                try {
+                    java.nio.file.Files.deleteIfExists(tempFile.toPath());
+                } catch (java.io.IOException ex) {
+                    log.warn("Failed to delete temp file: {}", tempFile, ex);
+                }
             }
         }
     }

@@ -56,7 +56,6 @@ public class PasswordComplexityValidator implements ConstraintValidator<ValidPas
             Pattern.CASE_INSENSITIVE
     );
     private static final Pattern REPEATED_PATTERN = Pattern.compile("(.)\\1{2,}"); // 3+ repeated chars
-    private static final int MIN_REPEATED_CHARS = 3;
     private static final String[] COMMON_WEAK_PASSWORDS = {
             "password", "passw0rd", "admin", "administrator", "root", "user",
             "qwerty", "123456", "welcome", "letmein", "monkey", "dragon"

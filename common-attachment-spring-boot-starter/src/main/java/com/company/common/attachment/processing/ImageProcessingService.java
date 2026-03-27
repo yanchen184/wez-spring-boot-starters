@@ -31,6 +31,7 @@ public class ImageProcessingService {
     private final AttachmentProperties properties;
 
     @Async
+    @Transactional
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onAttachmentUploaded(AttachmentUploadedEvent event) {
         if (!properties.getImage().isCompressionEnabled()) {
@@ -51,8 +52,7 @@ public class ImageProcessingService {
         }
     }
 
-    @Transactional
-    protected void compressImage(Long attachmentId, String storedFilename, long originalSize)
+    private void compressImage(Long attachmentId, String storedFilename, long originalSize)
             throws IOException {
         log.info("開始壓縮圖片: {} (id={}, size={} bytes)", storedFilename, attachmentId, originalSize);
 

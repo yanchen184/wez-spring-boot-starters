@@ -47,6 +47,7 @@ public class LoginAttemptService {
         });
     }
 
+    @Transactional
     public boolean isLocked(SaUser user) {
         if (!Boolean.TRUE.equals(user.getAccountLocked())) {
             return false;

@@ -164,23 +164,5 @@ public class MenuService {
 
     /**
      * @deprecated Use toTreeResponseFromMemory() with pre-loaded children to avoid N+1 queries.
-     * This method triggers lazy loading of children.
      */
-    @Deprecated
-    private MenuTreeResponse toTreeResponse(Menu menu) {
-        List<MenuTreeResponse> children = menu.getChildren().stream()
-                .filter(child -> Boolean.TRUE.equals(child.getEnabled()))
-                .map(this::toTreeResponse)
-                .toList();
-
-        return new MenuTreeResponse(
-                menu.getObjid(),
-                menu.getMenuName(),
-                menu.getMenuCode(),
-                menu.getUrl(),
-                menu.getIcon(),
-                menu.getSortOrder(),
-                children
-        );
-    }
 }

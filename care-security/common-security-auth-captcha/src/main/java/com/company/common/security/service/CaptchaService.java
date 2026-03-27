@@ -144,16 +144,6 @@ public class CaptchaService implements CaptchaVerifier {
         return renderAudio(code);
     }
 
-    /**
-     * Test-only: retrieve the stored answer for a captcha id.
-     * Do NOT use in production code.
-     */
-    public String getAnswerForTest(String captchaId) {
-        String key = REDIS_KEY_PREFIX + captchaId;
-        Object stored = redisTemplate.opsForValue().get(key);
-        return stored != null ? stored.toString() : null;
-    }
-
     public boolean isAudioEnabled() {
         return config.isAudioEnabled();
     }
